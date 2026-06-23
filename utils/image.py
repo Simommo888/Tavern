@@ -2,6 +2,7 @@ import logging
 import requests
 import base64
 import mimetypes
+import os
 from io import BytesIO
 import cv2
 
@@ -16,6 +17,9 @@ def download_image(url, save_path):
         response = requests.get(url, stream=True, timeout=(10, 300))
         response.raise_for_status() # Check for HTTP errors
 
+        parent = os.path.dirname(os.path.abspath(save_path))
+        if parent:
+            os.makedirs(parent, exist_ok=True)
         with open(save_path, 'wb') as file:
             for chunk in response.iter_content(chunk_size=1024):
                 file.write(chunk)

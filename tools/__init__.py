@@ -1,6 +1,7 @@
 # rendering abstraction
 from .protocols import ImageGenerator, VideoGenerator
 from .render_backend import RenderBackend
+from .digital_human_generator_heygen_api import DigitalHumanGeneratorHeyGenAPI, HeyGenGenerationResult
 
 # image generators
 from .image_generator_doubao_seedream_yunwu_api import ImageGeneratorDoubaoSeedreamYunwuAPI
@@ -22,6 +23,8 @@ __all__ = [
     "ImageGenerator",
     "VideoGenerator",
     "RenderBackend",
+    "DigitalHumanGeneratorHeyGenAPI",
+    "HeyGenGenerationResult",
     "ImageGeneratorDoubaoSeedreamYunwuAPI",
     "ImageGeneratorNanobananaGoogleAPI",
     "ImageGeneratorNanobananaYunwuAPI",

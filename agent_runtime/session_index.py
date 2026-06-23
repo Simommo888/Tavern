@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import re
+import threading
 from contextlib import contextmanager
 from datetime import datetime
 from functools import wraps
@@ -17,6 +18,18 @@ except ImportError:  # pragma: no cover - non-POSIX platforms
 
 
 STALE_KEYS = ["story", "characters", "script", "storyboard", "shot_descriptions", "camera_tree", "frames", "clips", "final_video"]
+_THREAD_LOCKS: dict[str, threading.RLock] = {}
+_THREAD_LOCKS_GUARD = threading.Lock()
+
+
+def _thread_lock_for(path: Path) -> threading.RLock:
+    key = str(path.resolve())
+    with _THREAD_LOCKS_GUARD:
+        lock = _THREAD_LOCKS.get(key)
+        if lock is None:
+            lock = threading.RLock()
+            _THREAD_LOCKS[key] = lock
+        return lock
 
 
 def _synchronized(method):
@@ -53,16 +66,18 @@ class SessionIndex:
 
     @contextmanager
     def _locked(self):
-        if fcntl is None:
-            yield
-            return
-        lock_path = self.vimax_dir / "sessions.lock"
-        with open(lock_path, "a+", encoding="utf-8") as handle:
-            fcntl.flock(handle, fcntl.LOCK_EX)
-            try:
+        thread_lock = _thread_lock_for(self.sessions_path)
+        with thread_lock:
+            if fcntl is None:
                 yield
-            finally:
-                fcntl.flock(handle, fcntl.LOCK_UN)
+                return
+            lock_path = self.vimax_dir / "sessions.lock"
+            with open(lock_path, "a+", encoding="utf-8") as handle:
+                fcntl.flock(handle, fcntl.LOCK_EX)
+                try:
+                    yield
+                finally:
+                    fcntl.flock(handle, fcntl.LOCK_UN)
 
     def load(self) -> dict[str, Any]:
         try:
@@ -82,7 +97,7 @@ class SessionIndex:
             return {"active_session_id": "", "sessions": {}}
 
     def save(self, data: dict[str, Any]) -> None:
-        tmp_path = self.sessions_path.with_name("sessions.json.tmp")
+        tmp_path = self.sessions_path.with_name(f"sessions.json.{os.getpid()}-{threading.get_ident()}.tmp")
         tmp_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
         os.replace(tmp_path, self.sessions_path)
 
@@ -254,6 +269,11 @@ class SessionIndex:
         novel_scenes = list((novel_dir / "scenes").glob("event_*/scene_*.json")) if novel_dir.exists() else []
         novel_event_chars = list((novel_dir / "global_information" / "characters" / "event_level").glob("event_*_characters.json")) if novel_dir.exists() else []
         novel_level_chars = list((novel_dir / "global_information" / "characters" / "novel_level").glob("novel_characters_after_event_*.json")) if novel_dir.exists() else []
+
+        production_dir = root / "production"
+        production_materials = production_dir / "materials.jsonl"
+        production_manifest = production_dir / "composition_manifest.json"
+        production_final_assets = list((production_dir / "assets" / "final").glob("*.mp4")) if production_dir.exists() else []
         return {
             "idea2video/story.txt": (idea_dir / "story.txt").exists(),
             "idea2video/characters.json": (idea_dir / "characters.json").exists(),
@@ -276,6 +296,10 @@ class SessionIndex:
             "novel2video/scenes/event_*/scene_*.json": bool(novel_scenes),
             "novel2video/global_information/characters/event_level/*.json": bool(novel_event_chars),
             "novel2video/global_information/characters/novel_level/*.json": bool(novel_level_chars),
+            "production/run.json": (production_dir / "run.json").exists(),
+            "production/materials.jsonl": production_materials.exists(),
+            "production/composition_manifest.json": production_manifest.exists(),
+            "production/assets/final/*.mp4": bool(production_final_assets),
         }
 
     def memory_text(self) -> str:
@@ -288,7 +312,7 @@ class SessionIndex:
         event = {"timestamp": datetime.now().isoformat(timespec="seconds"), **payload}
         path = self.logs_dir / f"{name}.jsonl"
         with path.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(event, ensure_ascii=False, default=str) + "\n")
+            f.write(json.dumps(event, ensure_ascii=True, default=str) + "\n")
 
     def snapshot(self) -> dict[str, Any]:
         active = self.active()

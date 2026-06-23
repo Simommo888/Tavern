@@ -25,6 +25,25 @@ After project_brief, characters, script, storyboard, shot_decomposition, and cam
 If the user explicitly asks for end-to-end generation, continue from planning into render tools.
 
 
+Alcohol live-commerce production DAG:
+
+```text
+user_idea
+  -> alcohol_story_generation
+  -> alcohol_script_generation
+  -> alcohol_storyboard_generation
+  -> heygen_live_room_generation
+  -> veo_transition_closeup_generation
+  -> ffmpeg_video_composition
+  -> production_run_status
+  -> user_review
+  -> production_performance_ingest
+  -> reusable_patterns
+```
+
+For alcohol sales video work, the main agent is a supervisor. It delegates work to business-level production tools and reviews their material ids and ledger state. The supervisor does not directly modify artifacts, run ffmpeg, call HeyGen, or call Veo. Every final video must have `production/run.json`, `production/materials.jsonl`, `production/composition_manifest.json`, and a final video material with traceable input material ids. Use `production_reusable_patterns_search` before creating a new run when the user asks to reuse past winning material or sales patterns.
+
+
 Novel workflow DAG:
 
 ```text

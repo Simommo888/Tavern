@@ -286,7 +286,7 @@ def build_builtin_registry(workspace_root: str | Path, session_index: Any, adapt
             normalized.append({"content": content, "status": status})
         path = todo_path()
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps({"items": normalized}, ensure_ascii=False, indent=2), encoding="utf-8")
+        path.write_text(json.dumps({"items": normalized}, ensure_ascii=True, indent=2), encoding="utf-8")
         return ToolResult("todo_write", True, f"Updated .vimax/todo.json with {len(normalized)} item(s)", {"items": normalized, "item_count": len(normalized)})
 
     async def sleep_tool(args: dict[str, Any], runtime: ToolRuntimeContext | None = None) -> ToolResult:
