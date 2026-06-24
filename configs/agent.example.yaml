@@ -2,10 +2,13 @@
 # Keep real keys out of commits. Prefer environment variables for shared or CI usage.
 
 llm:
+  # Supported providers: openai, claude, gemini.
+  # Claude uses the official Anthropic SDK; OpenAI supports compatible relays; Gemini uses google-genai.
   model_provider: openai
   model: <YOUR_LLM_MODEL>
   base_url: <YOUR_LLM_BASE_URL>
   api_key: ''
+  wire_api: chat_completions
 
 image:
   model: <YOUR_IMAGE_MODEL>

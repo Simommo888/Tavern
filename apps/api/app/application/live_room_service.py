@@ -114,18 +114,15 @@ class LiveRoomService:
         return reply
 
     async def _draft_reply(self, session: LiveRoomSession, event: AudienceEvent, intent: AudienceIntent) -> str:
-        system = "你是一个酒类电商直播间数字人主播。回答要口语化、简短、可信、克制，并严格遵守酒类合规：不面向未成年人，不宣传医疗保健功效，不鼓励过量饮酒或酒驾。"
-        prompt = {
-            "product": session.product.model_dump(),
-            "audience_event": event.model_dump(),
-            "intent": intent,
-            "instruction": "生成一句适合主播直接口播的中文回复，80字以内。",
-        }
+        prompt = {"product": session.product.model_dump(), "audience_event": event.model_dump(), "intent": intent}
         try:
-            message: AssistantMessage = await self.llm.complete([
-                {"role": "system", "content": system},
-                {"role": "user", "content": json.dumps(prompt, ensure_ascii=False)},
-            ], tools=[])
+            if hasattr(self.llm, "complete_prompt"):
+                message: AssistantMessage = await self.llm.complete_prompt("live_anchor_reply", prompt)
+            else:
+                message = await self.llm.complete([
+                    {"role": "system", "content": "你是酒类电商直播间数字人主播，回答要自然口语化、可信、克制，并严格遵守酒类合规。"},
+                    {"role": "user", "content": json.dumps(prompt, ensure_ascii=False)},
+                ], tools=[])
             text = message.text.strip()
             if text:
                 return text
