@@ -28,13 +28,19 @@ PROVIDER_PRESETS: Dict[str, Dict[str, Any]] = {
         ],
         "temperature_range": (0.0, 1.0),
     },
+    "xinshu": {
+        "base_url": "https://gpt.xinshu.ai",
+        "env_key": "OPENAI_API_KEY",
+        "default_model": "gpt-5.5",
+        "models": ["gpt-5.5"],
+    },
 }
 
 
 def resolve_chat_model_config(init_args: Dict[str, Any]) -> Dict[str, Any]:
     """Resolve provider presets and return final ``init_chat_model`` kwargs.
 
-    If ``model_provider`` matches a known preset (e.g. ``minimax``), the
+    If ``model_provider`` matches a known preset (e.g. ``minimax`` or ``xinshu``), the
     returned dict will have:
 
     * ``model_provider`` rewritten to ``"openai"`` (OpenAI-compatible API)

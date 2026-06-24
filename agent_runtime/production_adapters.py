@@ -7,10 +7,11 @@ from typing import Any
 from uuid import uuid4
 
 from interfaces.production import AlcoholSalesBrief, CompositionManifest, FfmpegCommandSummary, MaterialRecord
-from tools.digital_human_generator_heygen_api import DigitalHumanGeneratorHeyGenAPI
 from tools.video_generator_veo_google_api import VideoGeneratorVeoGoogleAPI
 from utils.ffmpeg_cli import compose_timeline
 
+from .heygen_skills import HeyGenLiveRoomSkills
+from .config import video_api_key, video_base_url, video_model
 from .models import ToolResult
 from .production_store import ProductionStore, manifest_from_materials
 from .tools import ToolArgumentSchema, ToolRuntimeContext, ToolSpec
@@ -65,15 +66,21 @@ def build_production_adapter_specs(workspace_root: str | Path, session_index: An
         ),
         ToolSpec(
             name="heygen_live_room_generation",
-            description="Worker agent: call HeyGen (or dry-run) to generate digital-human live-room clips and register clip materials.",
+            description="Compatibility alias: delegate HeyGen digital-human live-room generation to the digital-human live-room skill package.",
             handler=adapter.heygen_live_room_generation,
             schema={
                 "session_id": ToolArgumentSchema(str, required=False, default=""),
                 "run_id": ToolArgumentSchema(str, required=False, default=""),
                 "script_material_id": ToolArgumentSchema(str, required=False, default=""),
+                "heygen_script_material_id": ToolArgumentSchema(str, required=False, default=""),
+                "script_text": ToolArgumentSchema(str, required=False, default=""),
                 "avatar_id": ToolArgumentSchema(str, required=False, default=""),
                 "voice_id": ToolArgumentSchema(str, required=False, default=""),
                 "background_asset_path": ToolArgumentSchema(str, required=False, default=""),
+                "product_asset_paths": ToolArgumentSchema(list, required=False, default=[]),
+                "aspect_ratio": ToolArgumentSchema(str, required=False, default="9:16"),
+                "resolution": ToolArgumentSchema(str, required=False, default="1080p"),
+                "clip_role": ToolArgumentSchema(str, required=False, default="host_live_room"),
                 "dry_run": ToolArgumentSchema(bool, required=False, default=False),
             },
         ),
@@ -220,35 +227,9 @@ class AlcoholProductionAdapters:
             return _error("alcohol_storyboard_generation", str(exc))
 
     async def heygen_live_room_generation(self, args: dict[str, Any], runtime: ToolRuntimeContext | None = None) -> ToolResult:
-        try:
-            run = self._load_run(str(args.get("session_id") or ""))
-            script_id = str(args.get("script_material_id") or run.script_material_id or "")
-            script_material = self._require_material(run.session_id, script_id, "sales_script")
-            script_text = self._read_material_text(run.session_id, script_material)
-            dry_run = _dry_run(args)
-            task = self.store.start_task(run, agent_name="digital_human_live_room_agent", tool_name="heygen_live_room_generation", input_material_ids=[script_id], provider="heygen")
-            self._stage(run.session_id, "production_heygen", "Generating HeyGen digital human live-room clip")
-            generator = DigitalHumanGeneratorHeyGenAPI()
-            result = await generator.generate_live_room_segment(
-                script_text=_extract_host_lines(script_text),
-                avatar_id=str(args.get("avatar_id") or ""),
-                voice_id=str(args.get("voice_id") or ""),
-                background_asset_path=str(args.get("background_asset_path") or ""),
-                aspect_ratio="9:16",
-                resolution="1080p",
-                progress=lambda stage, message, metadata=None: _progress(runtime, stage, message, metadata),
-                dry_run=dry_run,
-            )
-            output_path = self.store.production_dir(run.session_id) / "assets" / "clips" / f"heygen-{task.task_id}.mp4"
-            result.save(str(output_path))
-            material = self.store.add_file_material(run, material_type="digital_human_video", role="host_live_room", file_path=output_path, source_agent="digital_human_live_room_agent", source_provider="heygen", provider_model="heygen", provider_job_id=result.provider_job_id, task_id=task.task_id, prompt=_extract_host_lines(script_text)[:1000], input_material_ids=[script_id], metadata={"raw_response": result.raw_response, "dry_run": dry_run})
-            run.digital_human_clip_ids.append(material.material_id)
-            run.stage = "digital_human_generated"
-            self.store.save_run(run)
-            self.store.finish_task(task, output_material_ids=[material.material_id], metadata={"provider_job_id": result.provider_job_id})
-            return _ok("heygen_live_room_generation", {"run_id": run.run_id, "digital_human_clip_material_ids": [material.material_id], "provider_job_ids": [result.provider_job_id], "next_tool": "ffmpeg_video_composition"})
-        except Exception as exc:
-            return _error("heygen_live_room_generation", str(exc))
+        """Backward-compatible entrypoint for callers that still use the production adapter directly."""
+        skill = HeyGenLiveRoomSkills(self.workspace_root, self.session_index)
+        return await skill.heygen_live_room_generate_clip(args, runtime)
 
     async def veo_transition_closeup_generation(self, args: dict[str, Any], runtime: ToolRuntimeContext | None = None) -> ToolResult:
         try:
@@ -395,10 +376,11 @@ class AlcoholProductionAdapters:
             pass
 
     def _build_veo_generator(self):
-        api_key = os.environ.get("GOOGLE_API_KEY") or os.environ.get("VIMAX_VIDEO_API_KEY") or os.environ.get("VIMAX_API_KEY")
+        api_key = video_api_key(self.workspace_root)
         if not api_key:
-            raise RuntimeError("GOOGLE_API_KEY or VIMAX_VIDEO_API_KEY is required for real Veo 3.1 generation. Set dry_run=true for a local dry run.")
-        return VideoGeneratorVeoGoogleAPI(api_key=api_key)
+            raise RuntimeError("GEMINI_API_KEY, GOOGLE_API_KEY, or VIMAX_VIDEO_API_KEY is required for real Veo 3.1 generation. Set dry_run=true for a local dry run.")
+        model = video_model(self.workspace_root)
+        return VideoGeneratorVeoGoogleAPI(api_key=api_key, t2v_model=model, ff2v_model=model, flf2v_model=model, base_url=video_base_url(self.workspace_root))
 
 
 def _sales_story_template(idea: str, brief: AlcoholSalesBrief) -> str:

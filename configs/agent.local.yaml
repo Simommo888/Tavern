@@ -1,21 +1,36 @@
 # ViMax local runtime configuration.
-# Keep real API keys out of this file. Prefer environment variables:
-#   VIMAX_LLM_API_KEY / OPENAI_API_KEY for the agent LLM
-#   VIMAX_IMAGE_API_KEY for image generation
-#   VIMAX_VIDEO_API_KEY for video generation
+# Secrets live in configs/agent.secrets.local.yaml (git-ignored) or environment variables.
+# Keep this tracked file free of real API keys.
 
 llm:
   model_provider: openai
-  model: gpt-4o-mini
-  base_url: https://api.openai.com/v1
+  model: gpt-5.5
+  review_model: gpt-5.5
+  base_url: https://gpt.xinshu.ai
+  wire_api: responses
   api_key: ''
+  model_reasoning_effort: xhigh
+  disable_response_storage: true
+  network_access: enabled
+  windows_wsl_setup_acknowledged: true
 
 # Image/video providers still need their own compatible API keys before full
 # rendering works. Leaving api_key empty makes ViMax read environment variables.
 image:
   api_key: ''
 
+# Video agents use a dedicated Gemini/Veo-compatible provider. Secrets live in
+# configs/agent.secrets.local.yaml or GEMINI_API_KEY / VIMAX_VIDEO_API_KEY.
 video:
+  model: gemini-3.1-pro
+  base_url: https://gpt.xinshu.ai
+  api_key: ''
+
+# Optional real TTS provider. Defaults can be overridden with TAVERN_TTS_* env vars.
+tts:
+  model: tts-1
+  voice: alloy
+  base_url: https://gpt.xinshu.ai/v1
   api_key: ''
 
 # Optional. Fill these only when using novel2video planning.
@@ -24,3 +39,6 @@ embedding:
 
 reranker:
   api_key: ''
+
+features:
+  goals: true

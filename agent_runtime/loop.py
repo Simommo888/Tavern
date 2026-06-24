@@ -162,12 +162,14 @@ def _openai_tool_call(call: ToolCall) -> dict[str, Any]:
 
 
 def build_runtime(workspace_root: str | Path = ".", llm: Any | None = None, adapter_specs: list[Any] | None = None) -> AgentLoop:
+    from .heygen_skills import build_heygen_skill_specs
     from .production_adapters import build_production_adapter_specs
     from .vimax_adapters import build_vimax_adapter_specs
     root = Path(workspace_root).resolve()
     session_index = SessionIndex(root)
     specs = adapter_specs if adapter_specs is not None else [
         *build_vimax_adapter_specs(root, session_index),
+        *build_heygen_skill_specs(root, session_index),
         *build_production_adapter_specs(root, session_index),
     ]
     registry = build_builtin_registry(root, session_index, specs)

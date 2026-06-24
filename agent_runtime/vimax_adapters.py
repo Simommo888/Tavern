@@ -22,6 +22,7 @@ from pipelines.script2video_pipeline import Script2VideoPipeline
 from tools.image_generator_nanobanana_yunwu_api import ImageGeneratorNanobananaYunwuAPI
 from tools.reranker_bge_silicon_api import RerankerBgeSiliconapi
 from tools.video_generator_openrouter_api import VideoGeneratorOpenRouterAPI
+from tools.video_generator_veo_google_api import VideoGeneratorVeoGoogleAPI
 from tools.video_generator_veo_yunwu_api import VideoGeneratorVeoYunwuAPI
 
 from .config import embedding_api_key, embedding_base_url, embedding_model, embedding_model_provider, image_api_key, image_base_url, image_model, llm_api_key, llm_base_url, llm_model, llm_model_provider, reranker_api_key, reranker_base_url, reranker_model, video_api_key, video_base_url, video_model, video_provider
@@ -526,10 +527,10 @@ def _build_image_generator() -> ImageGeneratorNanobananaYunwuAPI:
     return ImageGeneratorNanobananaYunwuAPI(api_key=api_key, model=image_model(), base_url=image_base_url())
 
 
-def _build_video_generator() -> VideoGeneratorVeoYunwuAPI | VideoGeneratorOpenRouterAPI:
+def _build_video_generator() -> VideoGeneratorVeoYunwuAPI | VideoGeneratorOpenRouterAPI | VideoGeneratorVeoGoogleAPI:
     api_key = video_api_key()
     if not api_key:
-        raise RuntimeError("VIMAX_VIDEO_API_KEY, VIMAX_LLM_API_KEY, or configs/agent.local.yaml video/llm api_key is required for video generation")
+        raise RuntimeError("VIMAX_VIDEO_API_KEY, GEMINI_API_KEY, GOOGLE_API_KEY, or configs/agent.local.yaml video.api_key is required for video generation")
     model = video_model()
     base_url = video_base_url()
     provider = video_provider().strip().lower()
@@ -537,6 +538,8 @@ def _build_video_generator() -> VideoGeneratorVeoYunwuAPI | VideoGeneratorOpenRo
         return VideoGeneratorOpenRouterAPI(api_key=api_key, model=model, base_url=base_url)
     if provider == "yunwu":
         return VideoGeneratorVeoYunwuAPI(api_key=api_key, t2v_model=model, ff2v_model=model, base_url=base_url)
+    if provider == "google":
+        return VideoGeneratorVeoGoogleAPI(api_key=api_key, t2v_model=model, ff2v_model=model, flf2v_model=model, base_url=base_url)
     raise RuntimeError(f"Unsupported video base_url for automatic provider matching: {base_url}")
 
 

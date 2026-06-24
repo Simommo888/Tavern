@@ -31,6 +31,18 @@ class WorkbenchApiTests(unittest.TestCase):
             self.assertEqual(snapshot.status_code, 200)
             self.assertEqual([event["type"] for event in snapshot.json()["events"]], ["session_created", "audience_event", "speech_artifact", "anchor_reply"])
 
+    def test_live_api_v1_accepts_async_audience_event(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            live_module._service = LiveRoomService(Path(tmp))
+            client = TestClient(create_app())
+
+            created = client.post("/api/v1/live/sessions", json={"product_name": "异步礼盒"})
+            session_id = created.json()["session"]["session_id"]
+            accepted = client.post(f"/api/v1/live/sessions/{session_id}/events?mode=async", json={"text": "适合送礼吗？", "user_name": "异步观众"})
+            self.assertEqual(accepted.status_code, 202)
+            self.assertTrue(accepted.json()["accepted"])
+            self.assertEqual(accepted.json()["task"]["task_type"], "live.audience_event.received")
+
     def test_workbench_business_apis_expose_seeded_operational_data(self):
         with tempfile.TemporaryDirectory() as tmp:
             workbench_module._service = WorkbenchService(Path(tmp))

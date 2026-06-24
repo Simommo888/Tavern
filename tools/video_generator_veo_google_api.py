@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import List, Optional
 import asyncio
 from google import genai
@@ -17,17 +18,32 @@ class VideoGeneratorVeoGoogleAPI:
         t2v_model: str = "veo-3.1-generate-preview",
         ff2v_model: str = "veo-3.1-generate-preview",
         flf2v_model: str = "veo-3.1-generate-preview",
+        base_url: str = "",
         rate_limiter: Optional[RateLimiter] = None,
     ):
-        self.api_key = api_key
-        self.t2v_model = t2v_model
-        self.ff2v_model = ff2v_model
-        self.flf2v_model = flf2v_model
+        resolved_key = api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY") or os.environ.get("VIMAX_VIDEO_API_KEY")
+        resolved_base_url = base_url or os.environ.get("GOOGLE_GEMINI_BASE_URL", "")
+        resolved_model = os.environ.get("GEMINI_MODEL", "")
+        if not resolved_key or not resolved_base_url or not resolved_model:
+            try:
+                from agent_runtime.config import video_api_key, video_base_url, video_model
+
+                resolved_key = resolved_key or video_api_key()
+                resolved_base_url = resolved_base_url or video_base_url()
+                resolved_model = resolved_model or video_model()
+            except Exception:
+                pass
+        self.api_key = resolved_key or ""
+        self.t2v_model = resolved_model or t2v_model
+        self.ff2v_model = resolved_model or ff2v_model
+        self.flf2v_model = resolved_model or flf2v_model
+        self.base_url = (resolved_base_url or "").rstrip("/")
         self.rate_limiter = rate_limiter
 
-        self.client = genai.Client(
-            api_key=api_key,
-        )
+        client_kwargs = {"api_key": self.api_key}
+        if self.base_url:
+            client_kwargs["http_options"] = types.HttpOptions(base_url=self.base_url, api_version="v1beta")
+        self.client = genai.Client(**client_kwargs)
     
     async def generate_single_video(
         self,

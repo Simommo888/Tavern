@@ -181,7 +181,7 @@ class TestPipelineInitFromConfig(unittest.TestCase):
         mock_init.assert_called_once()
         call_kwargs = mock_init.call_args[1]
         self.assertEqual(call_kwargs["model_provider"], "openai")
-        self.assertEqual(call_kwargs["base_url"], "https://openrouter.ai/api/v1")
+        self.assertEqual(call_kwargs["base_url"], "https://gpt.xinshu.ai")
 
 
 if __name__ == "__main__":

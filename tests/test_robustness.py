@@ -44,7 +44,7 @@ def _fake_completion(text="ok"):
 
 class TestLLMClient(unittest.IsolatedAsyncioTestCase):
     def _llm(self, create):
-        llm = OpenAICompatibleLLM(model="m", base_url="http://localhost:1", api_key="k")
+        llm = OpenAICompatibleLLM(model="m", base_url="http://localhost:1", api_key="k", wire_api="chat_completions")
         llm.client = MagicMock(chat=MagicMock(completions=MagicMock(create=create)))
         return llm
 

@@ -17,20 +17,36 @@ DEFAULT_VIDEO_BASE_URL = "https://openrouter.ai/api/v1"
 DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small"
 DEFAULT_EMBEDDING_MODEL_PROVIDER = "openai"
 DEFAULT_RERANKER_MODEL = "BAAI/bge-reranker-v2-m3"
+DEFAULT_TTS_MODEL = "tts-1"
+DEFAULT_TTS_VOICE = "alloy"
 
 
 @lru_cache(maxsize=4)
 def load_agent_config(workspace_root: str | Path = ".") -> dict[str, Any]:
-    path = Path(workspace_root).resolve() / "configs" / "agent.local.yaml"
-    if not path.exists():
-        return {}
-    try:
-        payload = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    except yaml.YAMLError as exc:
-        raise RuntimeError(f"Invalid configs/agent.local.yaml: {exc}") from exc
-    if not isinstance(payload, dict):
-        raise RuntimeError("configs/agent.local.yaml must be a YAML mapping")
+    root = Path(workspace_root).resolve()
+    payload: dict[str, Any] = {}
+    for name in ("agent.local.yaml", "agent.secrets.local.yaml"):
+        path = root / "configs" / name
+        if not path.exists():
+            continue
+        try:
+            loaded = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        except yaml.YAMLError as exc:
+            raise RuntimeError(f"Invalid configs/{name}: {exc}") from exc
+        if not isinstance(loaded, dict):
+            raise RuntimeError(f"configs/{name} must be a YAML mapping")
+        payload = _deep_merge(payload, loaded)
     return payload
+
+
+def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    merged = dict(base)
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = _deep_merge(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
 
 
 def config_value(section: str, key: str, env_names: list[str], default: str = "", workspace_root: str | Path = ".") -> str:
@@ -58,8 +74,23 @@ def llm_base_url(workspace_root: str | Path = ".") -> str:
     return config_value("llm", "base_url", ["VIMAX_LLM_BASE_URL"], DEFAULT_LLM_BASE_URL, workspace_root)
 
 
+def llm_wire_api(workspace_root: str | Path = ".") -> str:
+    return config_value("llm", "wire_api", ["VIMAX_LLM_WIRE_API"], "chat_completions", workspace_root)
+
+
 def llm_api_key(workspace_root: str | Path = ".") -> str:
-    return config_value("llm", "api_key", ["VIMAX_LLM_API_KEY", "VIMAX_API_KEY"], "", workspace_root)
+    # VIMAX_LLM_API_KEY is an explicit project override. Generic OPENAI_API_KEY is
+    # only a fallback so unrelated shell/global OpenAI keys do not override
+    # configs/agent.secrets.local.yaml for this project.
+    explicit = os.environ.get("VIMAX_LLM_API_KEY")
+    if explicit:
+        return explicit
+    section_payload = load_agent_config(workspace_root).get("llm", {})
+    if isinstance(section_payload, dict):
+        value = section_payload.get("api_key")
+        if isinstance(value, str) and value:
+            return value
+    return os.environ.get("OPENAI_API_KEY") or os.environ.get("VIMAX_API_KEY") or ""
 
 
 def image_model(workspace_root: str | Path = ".") -> str:
@@ -103,16 +134,32 @@ def reranker_api_key(workspace_root: str | Path = ".") -> str:
     return config_value("reranker", "api_key", ["VIMAX_RERANKER_API_KEY"], "", workspace_root)
 
 
+def tts_model(workspace_root: str | Path = ".") -> str:
+    return config_value("tts", "model", ["TAVERN_TTS_MODEL", "OPENAI_TTS_MODEL"], DEFAULT_TTS_MODEL, workspace_root)
+
+
+def tts_voice(workspace_root: str | Path = ".") -> str:
+    return config_value("tts", "voice", ["TAVERN_TTS_VOICE", "OPENAI_TTS_VOICE"], DEFAULT_TTS_VOICE, workspace_root)
+
+
+def tts_base_url(workspace_root: str | Path = ".") -> str:
+    return config_value("tts", "base_url", ["TAVERN_TTS_BASE_URL", "OPENAI_TTS_BASE_URL"], llm_base_url(workspace_root), workspace_root)
+
+
+def tts_api_key(workspace_root: str | Path = ".") -> str:
+    return config_value("tts", "api_key", ["TAVERN_TTS_API_KEY", "OPENAI_TTS_API_KEY"], llm_api_key(workspace_root), workspace_root)
+
+
 def video_model(workspace_root: str | Path = ".") -> str:
-    return config_value("video", "model", ["VIMAX_VIDEO_MODEL"], DEFAULT_VIDEO_MODEL, workspace_root)
+    return config_value("video", "model", ["VIMAX_VIDEO_MODEL", "GEMINI_MODEL"], DEFAULT_VIDEO_MODEL, workspace_root)
 
 
 def video_base_url(workspace_root: str | Path = ".") -> str:
-    return config_value("video", "base_url", ["VIMAX_VIDEO_BASE_URL"], DEFAULT_VIDEO_BASE_URL, workspace_root)
+    return config_value("video", "base_url", ["VIMAX_VIDEO_BASE_URL", "GOOGLE_GEMINI_BASE_URL"], DEFAULT_VIDEO_BASE_URL, workspace_root)
 
 
 def video_api_key(workspace_root: str | Path = ".") -> str:
-    return config_value("video", "api_key", ["VIMAX_VIDEO_API_KEY", "VIMAX_LLM_API_KEY", "VIMAX_API_KEY"], llm_api_key(workspace_root), workspace_root)
+    return config_value("video", "api_key", ["VIMAX_VIDEO_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", "VIMAX_API_KEY"], llm_api_key(workspace_root), workspace_root)
 
 
 def api_provider_from_base_url(base_url: str) -> str:
@@ -121,6 +168,8 @@ def api_provider_from_base_url(base_url: str) -> str:
         return "openrouter"
     if "yunwu.ai" in normalized:
         return "yunwu"
+    if "gpt.xinshu.ai" in normalized:
+        return "google"
     return ""
 
 

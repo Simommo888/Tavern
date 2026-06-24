@@ -1,9 +1,9 @@
 chat_model:
   init_args:
-    model: google/gemini-2.5-flash-lite-preview-09-2025
-    model_provider: openai
-    api_key:
-    base_url: https://openrouter.ai/api/v1
+    model: gpt-5.5
+    model_provider: xinshu
+    api_key:  # leave empty to use OPENAI_API_KEY
+    base_url: https://gpt.xinshu.ai
   # Rate limits for chat model API calls
   # Set to null to disable rate limiting for this service
   max_requests_per_minute: 500
