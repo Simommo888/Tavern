@@ -87,6 +87,32 @@ class WorkbenchApiTests(unittest.TestCase):
             self.assertEqual(platform_event.status_code, 200)
             self.assertEqual(platform_event.json()["event"]["text"], "真假怎么保证？")
 
+    def test_operator_write_apis_update_workbench_state(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            workbench_module._service = WorkbenchService(Path(tmp))
+            client = TestClient(create_app())
+
+            product = client.post("/api/v1/products", json={"product_name": "龙八礼盒", "sku": "LB-001", "price": 299}).json()["product"]
+            published = client.post(f"/api/v1/products/{product['product_id']}/publish")
+            self.assertEqual(published.status_code, 200)
+            self.assertEqual(published.json()["product"]["status"], "published")
+            unpublished = client.post(f"/api/v1/products/{product['product_id']}/unpublish")
+            self.assertEqual(unpublished.json()["product"]["status"], "draft")
+
+            rule = client.post("/api/v1/workflow/rules", json={"name": "关注促单", "event_type": "user_follow", "action_type": "sales_push"}).json()["rule"]
+            toggled = client.patch(f"/api/v1/workflow/rules/{rule['rule_id']}", json={"enabled": False})
+            self.assertEqual(toggled.status_code, 200)
+            self.assertFalse(toggled.json()["rule"]["enabled"])
+
+            document = client.post("/api/v1/knowledge/documents", json={"name": "测试资料", "source_type": "text"}).json()["document"]
+            indexed = client.post(f"/api/v1/knowledge/documents/{document['document_id']}/index", json={"text": "商务宴请\n节日送礼"})
+            self.assertEqual(indexed.status_code, 200)
+            self.assertEqual(indexed.json()["document"]["chunk_count"], 2)
+
+            metric = client.post("/api/v1/platform/metrics", json={"online_users": 99, "gmv": 1234, "order_count": 12})
+            self.assertEqual(metric.status_code, 200)
+            self.assertEqual(metric.json()["metric"]["online_users"], 99)
+
     def test_live_anchor_graph_produces_compliant_reply(self):
         result = LiveAnchorGraph().run({"event_text": "喝了是不是养生？", "product_context": {"product_name": "测试酒"}})
         self.assertEqual(result["intent"], "compliance_risk")

@@ -100,6 +100,12 @@ def update_script_template(template_id: str, payload: dict[str, Any]) -> dict[st
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
+@router.delete("/scripts/templates/{template_id}")
+def delete_script_template(template_id: str) -> dict[str, str]:
+    _service.scripts.delete(template_id)
+    return {"status": "deleted"}
+
+
 @router.post("/scripts/templates/generate")
 def generate_script_template(payload: dict[str, Any]) -> dict[str, Any]:
     category = str(payload.get("category") or "interaction")
@@ -119,6 +125,21 @@ def create_workflow_rule(payload: dict[str, Any]) -> dict[str, Any]:
     return {"rule": _service.workflow_rules.upsert(WorkflowRule.model_validate(payload)).model_dump()}
 
 
+@router.patch("/workflow/rules/{rule_id}")
+def update_workflow_rule(rule_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    try:
+        rule = _service.workflow_rules.get(rule_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"rule": _service.workflow_rules.upsert(rule.model_copy(update=payload)).model_dump()}
+
+
+@router.delete("/workflow/rules/{rule_id}")
+def delete_workflow_rule(rule_id: str) -> dict[str, str]:
+    _service.workflow_rules.delete(rule_id)
+    return {"status": "deleted"}
+
+
 @router.get("/platform/accounts")
 def list_platform_accounts() -> dict[str, Any]:
     return {"accounts": [item.model_dump() for item in _service.platform_accounts.list()]}
@@ -129,6 +150,13 @@ def list_platform_metrics() -> dict[str, Any]:
     return {"metrics": [item.model_dump() for item in _service.metrics.list()]}
 
 
+@router.post("/platform/metrics")
+def create_platform_metric(payload: dict[str, Any]) -> dict[str, Any]:
+    from apps.api.app.domain.workbench.entities import PlatformMetricSnapshot
+
+    return {"metric": _service.metrics.upsert(PlatformMetricSnapshot.model_validate(payload)).model_dump()}
+
+
 @router.get("/knowledge/documents")
 def list_knowledge_documents() -> dict[str, Any]:
     return {"documents": [item.model_dump() for item in _service.knowledge_documents.list()]}
@@ -137,6 +165,14 @@ def list_knowledge_documents() -> dict[str, Any]:
 @router.post("/knowledge/documents")
 def create_knowledge_document(payload: dict[str, Any]) -> dict[str, Any]:
     return {"document": _service.create_knowledge_document(payload).model_dump()}
+
+
+@router.delete("/knowledge/documents/{document_id}")
+def delete_knowledge_document(document_id: str) -> dict[str, str]:
+    _service.knowledge_documents.delete(document_id)
+    remaining_chunks = [chunk for chunk in _service.knowledge_chunks.list() if chunk.document_id != document_id]
+    _service.knowledge_chunks._write(remaining_chunks)
+    return {"status": "deleted"}
 
 
 @router.post("/knowledge/documents/{document_id}/index")
