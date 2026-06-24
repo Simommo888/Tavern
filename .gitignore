@@ -15,8 +15,11 @@ wheels/
 .test/
 # Node dependencies
 node_modules/
+.next/
+*.tsbuildinfo
 
 # Local agent secrets
 configs/*.local.json
 configs/*.local.yaml
 !configs/agent.local.yaml
+configs/agent.secrets.local.yaml
