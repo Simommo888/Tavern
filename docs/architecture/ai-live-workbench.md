@@ -293,19 +293,19 @@ erDiagram
 ```text
 D:/Tavern
   apps/
-    api/               # FastAPI backend
-    web/               # Next.js LiveOS console
-  packages/            # shared domain/config/testing packages
-  services/            # model, TTS, avatar, video, RAG, streaming, analytics boundaries
-  plugins/             # plugin interfaces, manager, loader and providers
-  workers/             # background workers
-  agents/              # active agent code; Agent Company refactor happens later
-  workflows/           # workflow definitions, runners, nodes and visual assets
-  components/          # reusable composition/UI component boundary
-  assets/              # Tavern-owned raw/processed/generated assets
-  shared/              # cross-runtime shared types/constants/utilities
-  legacy/              # archived ViMax-era documentation and deprecated assets
-  third_party/         # external OSS integrations tracked by manifest
+    api/               # FastAPI 后端
+    web/               # Next.js LiveOS 控制台
+  packages/            # 共享 domain/config/testing packages
+  services/            # model、TTS、avatar、video、RAG、streaming、analytics 边界
+  plugins/             # plugin interfaces、manager、loader 和 providers
+  workers/             # 后台 workers
+  agents/              # 当前活跃 agent 代码；Agent Company 重构稍后进行
+  workflows/           # workflow definitions、runners、nodes 和 visual assets
+  components/          # 可复用 composition/UI 组件边界
+  assets/              # Tavern 自有 raw/processed/generated assets
+  shared/              # 跨运行时 shared types/constants/utilities
+  legacy/              # 归档的 ViMax 时代文档和废弃资产
+  third_party/         # 由 manifest 跟踪的外部 OSS 集成
   docs/
   infra/
   tests/
@@ -336,22 +336,22 @@ class LiveAnchorState(TypedDict):
 
 节点：
 
-- normalize event
-- classify intent
-- retrieve product knowledge
-- pre compliance check
-- plan reply strategy
-- generate reply
-- post compliance check
-- persist reply
-- request TTS
-- publish live event
+- 规范化 event
+- 识别 intent
+- 检索商品知识
+- 执行合规前检
+- 规划回复策略
+- 生成回复
+- 执行合规后检
+- 持久化回复
+- 请求 TTS
+- 发布直播 event
 
 失败策略：
 
-- LLM 失败：使用合规 fallback reply。
+- LLM 失败：使用合规兜底回复。
 - RAG 失败：仅用结构化商品字段。
-- TTS 失败：返回文本与浏览器语音 fallback。
+- TTS 失败：返回文本与浏览器语音兜底。
 - 高风险合规：不调用销售促单，直接安全模板。
 
 ## 9. MVP 版本规划
@@ -431,7 +431,7 @@ MVP 只做真实可开发闭环：
 Compose 服务：
 
 - `api`：FastAPI
-- `worker`：RabbitMQ consumer
+- `worker`：RabbitMQ 消费者
 - `web`：Next.js
 - `postgres`
 - `redis`
@@ -476,4 +476,4 @@ docker compose -f infra/docker/docker-compose.yml up --build
 - RabbitMQ/Redis 使用托管服务或 Operator。
 - Milvus 单独部署并配置持久化。
 - Secret 使用 External Secrets Operator。
-- 所有服务启用 readiness/liveness。
+- 所有服务启用就绪检查和存活检查。

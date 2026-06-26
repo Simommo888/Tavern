@@ -1,55 +1,55 @@
-# Tavern LiveOS Final Architecture
+# Tavern LiveOS 最终架构
 
-Phase 10 freezes Tavern as an enterprise-grade AI Digital Live Commerce Operating System. The system is intentionally split by runtime boundary and optimized around two principles: delete redundant legacy code, and reuse mature providers through plugins instead of rebuilding engines.
+Phase 10 将 Tavern 固化为企业级 AI Digital Live Commerce Operating System。系统按运行时边界拆分，并围绕两个原则优化：删除冗余 legacy 代码，以及通过插件复用成熟 provider，而不是重复构建引擎。
 
-## Runtime boundaries
+## 运行时边界
 
 ```text
 apps/
-  api/                 FastAPI backend, domain services, plugin orchestration, file-backed MVP repositories
-  web/                 Next.js operating console for Studio, Workflow, Analytics, Assets, Components, MVP
-agent_runtime/         model gateway, prompt/config helpers, agent runtime compatibility layer
-interfaces/            shared production-time primitives
-packages/              future shared Python/TypeScript packages
-services/              service-boundary placeholders for model, TTS, avatar, video, RAG, streaming, analytics
-plugins/               top-level plugin contracts/notes; backend implementations live in apps/api/app/plugins
-workers/               async/background workers
+  api/                 FastAPI 后端、domain services、plugin orchestration、基于文件的 MVP repositories
+  web/                 面向 Studio、Workflow、Analytics、Assets、Components、MVP 的 Next.js 运营控制台
+agent_runtime/         model gateway、prompt/config helpers、agent runtime 兼容层
+interfaces/            生产时共享 primitives
+packages/              后续共享 Python/TypeScript packages
+services/              model、TTS、avatar、video、RAG、streaming、analytics 的服务边界占位
+plugins/               顶层 plugin contracts/notes；后端实现位于 apps/api/app/plugins
+workers/               异步/后台 workers
 workflows/             workflow definitions/runners/visual assets
-components/            reusable live-room/studio/analytics composition building blocks
-assets/                Tavern-owned raw/processed/generated assets
-shared/                cross-runtime constants and shared types
+components/            可复用 live-room/studio/analytics 组合构件
+assets/                Tavern 自有 raw/processed/generated assets
+shared/                跨运行时 constants 与 shared types
 infra/
-  docker/              Dockerfiles, compose, local service dependencies
-  k8s/                 deployment skeleton
-third_party/           OSS integration manifest, not business logic
-legacy/                archived ViMax-era code/docs/assets
+  docker/              Dockerfiles、compose、本地服务依赖
+  k8s/                 部署骨架
+third_party/           OSS integration manifest，不放业务逻辑
+legacy/                归档的 ViMax 时代 code/docs/assets
 ```
 
-## Main product flow
+## 主产品流程
 
-Phase 9 MVP is now the reference golden path:
+Phase 9 MVP 是当前参考黄金路径：
 
 ```text
-Upload Product
+上传商品
   ↓
-Brand Analysis
+品牌分析
   ↓
-Script
+生成脚本
   ↓
-Digital Human Speech
+数字人口播
   ↓
-Avatar Video
+数字人视频
   ↓
-Live Video
+直播视频
   ↓
-Saved Live Plan
+保存直播方案
 ```
 
-The backend persists this as `MvpLivePlan` and also emits `WorkflowRun` / `WorkflowNodeRun` records for auditability.
+后端将该流程持久化为 `MvpLivePlan`，并同时产生 `WorkflowRun` / `WorkflowNodeRun` 记录以便审计。
 
-## Plugin architecture
+## 插件架构
 
-Business code must call providers through this chain:
+业务代码必须通过以下链路调用 provider：
 
 ```text
 Plugin Interface
@@ -61,23 +61,23 @@ Plugin Loader
 Plugin Implementation
 ```
 
-Current providers:
+当前 providers：
 
-| Category | Provider | Status | Notes |
+| 类别 | Provider | 状态 | 说明 |
 | --- | --- | --- | --- |
-| Model | OpenAI Compatible Model Gateway | ready/configured by gateway | wraps `agent_runtime.llm.ModelGateway` |
-| TTS | Edge TTS | ready | local/free fallback |
-| TTS | OpenAI Compatible TTS | ready when configured | `/audio/speech` compatible |
-| TTS | Fish Speech | candidate_not_installed | tracked in `third_party/manifest.json` |
-| Avatar | LiveTalking | candidate_not_installed | wrapper candidate |
-| Avatar | MuseTalk | candidate_not_installed | wrapper candidate |
-| Avatar | SadTalker | candidate_not_installed | fallback candidate |
-| Video | FFmpeg / MoviePy Composer | ready | local wrapper, no duplicate video engine |
-| RAG | Local Keyword RAG | ready | file-backed MVP retrieval |
+| Model | OpenAI Compatible Model Gateway | ready/由 gateway 配置 | 封装 `agent_runtime.llm.ModelGateway` |
+| TTS | Edge TTS | ready | 本地/免费备用方案 |
+| TTS | OpenAI Compatible TTS | 配置后 ready | 兼容 `/audio/speech` |
+| TTS | Fish Speech | candidate_not_installed | 在 `third_party/manifest.json` 中跟踪 |
+| Avatar | LiveTalking | candidate_not_installed | wrapper 候选 |
+| Avatar | MuseTalk | candidate_not_installed | wrapper 候选 |
+| Avatar | SadTalker | candidate_not_installed | 备用候选 |
+| Video | FFmpeg / MoviePy Composer | ready | 本地 wrapper，不重复建设视频引擎 |
+| RAG | Local Keyword RAG | ready | 基于文件的 MVP 检索 |
 
-## Configuration contract
+## 配置契约
 
-Unified environment variables:
+统一环境变量：
 
 - `TAVERN_APP_NAME`
 - `TAVERN_ENV`
@@ -94,40 +94,40 @@ Unified environment variables:
 - `MINIO_SECRET_KEY`
 - `NEXT_PUBLIC_API_BASE`
 
-Local secrets remain in `configs/*.local.yaml` and `configs/agent.secrets.local.yaml`; they must not be committed.
+本地密钥保存在 `configs/*.local.yaml` 和 `configs/agent.secrets.local.yaml`；这些文件不得提交。
 
-## Logging and health
+## 日志与健康检查
 
-- Backend logging is initialized via `apps/api/app/core/logging.py`.
-- Runtime settings are centralized in `apps/api/app/core/settings.py`.
-- API health endpoints:
-  - `/health` returns app/environment/storage status.
-  - `/ready` verifies readiness contract; Postgres mode requires `DATABASE_URL`.
+- 后端日志通过 `apps/api/app/core/logging.py` 初始化。
+- 运行时 settings 集中在 `apps/api/app/core/settings.py`。
+- API 健康检查端点：
+  - `/health` 返回 app/environment/storage 状态。
+  - `/ready` 验证就绪契约；Postgres 模式要求配置 `DATABASE_URL`。
 
-## Persistence
+## 持久化
 
-Current MVP storage remains file-backed for local single-machine operation:
+当前 MVP 存储仍然基于文件，以支持本地单机运行：
 
 ```text
 .working_dir/workbench/*.json
 .working_dir/live_rooms/**
 ```
 
-PostgreSQL schema exists at `infra/docker/postgres/001_init.sql`. Migration guidance is in `docs/database/repository-migration.md`.
+PostgreSQL schema 位于 `infra/docker/postgres/001_init.sql`。迁移指南见 `docs/database/repository-migration.md`。
 
 ## Docker
 
-Local stack:
+本地 stack：
 
 ```bash
 docker compose -f infra/docker/docker-compose.yml --env-file infra/docker/.env.example up --build
 ```
 
-Services:
+服务：
 
-- `api`: FastAPI, `/ready` healthcheck
-- `web`: Next.js standalone-capable build, `/` healthcheck
-- `worker`: optional profile
+- `api`：FastAPI，`/ready` 健康检查
+- `web`：支持 standalone build 的 Next.js，`/` 健康检查
+- `worker`：可选 profile
 - `postgres`
 - `redis`
 - `rabbitmq`
@@ -135,18 +135,18 @@ Services:
 
 ## CI/CD
 
-GitHub Actions workflow: `.github/workflows/ci.yml`
+GitHub Actions workflow：`.github/workflows/ci.yml`
 
-Jobs:
+Jobs：
 
-- Backend: `uv sync --frozen --dev` + selected regression tests
-- Web: `npm ci` + `npm run ci` (`typecheck` + `build`)
+- 后端：`uv sync --frozen --dev` + 选定回归测试
+- 前端：`npm ci` + `npm run ci`（`typecheck` + `build`）
 
-## Phase 10 rules going forward
+## Phase 10 后续规则
 
-1. New capabilities must enter through plugin interfaces or workflow nodes.
-2. Do not put business logic in `third_party/`.
-3. Do not create parallel API clients; use `apps/web/lib/api/config.ts`.
-4. Do not bypass `apps/api/app/core/settings.py` for runtime configuration.
-5. File-backed repositories are acceptable for MVP/local mode; Postgres mode must fail fast when not configured.
-6. Any new runtime service must expose health/readiness and be added to Docker/CI docs.
+1. 新能力必须通过 plugin interfaces 或 workflow nodes 进入系统。
+2. 不要把业务逻辑放进 `third_party/`。
+3. 不要创建并行 API clients；使用 `apps/web/lib/api/config.ts`。
+4. 运行时配置不要绕过 `apps/api/app/core/settings.py`。
+5. 基于文件的 repositories 可用于 MVP/local 模式；Postgres 模式未配置时必须快速失败。
+6. 任何新的运行时服务都必须暴露健康检查/就绪检查，并补充到 Docker/CI 文档。

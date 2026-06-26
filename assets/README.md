@@ -1,5 +1,5 @@
-# assets
+# assets 目录
 
-Tavern-owned raw, processed and generated assets.
+Tavern 自有的原始、处理后与生成类资产目录。
 
-Legacy ViMax branding assets were moved to `legacy/vimax/assets/` during Phase 2.
+Legacy ViMax 品牌资产已在 Phase 2 移动到 `legacy/vimax/assets/`。

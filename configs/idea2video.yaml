@@ -2,10 +2,10 @@ chat_model:
   init_args:
     model: gpt-5.5
     model_provider: xinshu
-    api_key:  # leave empty to use OPENAI_API_KEY
+    api_key:  # 留空则使用 OPENAI_API_KEY
     base_url: https://gpt.xinshu.ai
-  # Rate limits for chat model API calls
-  # Set to null to disable rate limiting for this service
+  # 聊天模型 API 调用限流
+  # 设置为 null 可关闭该服务的限流
   max_requests_per_minute: 500
   max_requests_per_day: 2000
 
@@ -13,8 +13,8 @@ image_generator:
   class_path: tools.ImageGeneratorNanobananaGoogleAPI
   init_args:
     api_key:
-  # Rate limits for image generation API calls
-  # Set to null to disable rate limiting for this service
+  # 图像生成 API 调用限流
+  # 设置为 null 可关闭该服务的限流
   max_requests_per_minute: 10
   max_requests_per_day: 500
 
@@ -23,8 +23,8 @@ video_generator:
   class_path: tools.VideoGeneratorVeoGoogleAPI
   init_args:
     api_key:
-  # Rate limits for video generation API calls
-  # Set to null to disable rate limiting for this service
+  # 视频生成 API 调用限流
+  # 设置为 null 可关闭该服务的限流
   max_requests_per_minute: 2
   max_requests_per_day: 10
 

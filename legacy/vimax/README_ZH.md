@@ -2,7 +2,7 @@
   <img src="./assets/vimax.png"> 
   <br>
   <br>
-  <h1 align="center">ViMax: Agentic Video Generation</h1>
+  <h1 align="center">ViMax：智能体视频生成</h1>
 
   <div align="center">
   </div>
@@ -360,39 +360,44 @@ https://github.com/user-attachments/assets/5bad46b2-8276-4e1d-9480-3522640744b2
 
 
 
-## 🚀Quick Start
+## 🚀 快速开始
 
-### 🖥️ **Environment**
+### 🖥️ **环境**
 
-```
+```text
 OS: Linux, Windows
 ```
 
-### 📥 **Clone and Install**
-We use uv to manage the environment. For uv installation, please refer to the https://docs.astral.sh/uv/getting-started/installation/.
+### 📥 **克隆与安装**
+
+ViMax 使用 uv 管理环境。uv 安装方式请参考 https://docs.astral.sh/uv/getting-started/installation/。
+
 ```bash
 git clone https://github.com/HKUDS/ViMax.git
 cd ViMax
 uv sync
 ```
 
+### 🧠 **交互式 Agent TUI / Agents Loop**
 
-### 🧠 **Agent TUI / Agents Loop**
-ViMax also provides a minimal TUI for interactive agent-based video creation. Configure `configs/agent.local.yaml` for the LLM, image, and video providers, then start the TUI from the ViMax root directory.
+ViMax 提供最小化 TUI，用于交互式 agent 视频创作。在 ViMax 根目录启动前，请先在 `configs/agent.local.yaml` 中配置 LLM、image 和 video providers。
+
 ```bash
 vimax tui
 ```
 
-Start a new session or resume an existing one:
+新建 session 或恢复已有 session：
+
 ```bash
 vimax tui new
 vimax tui resume
 vimax tui resume <session_id>
 ```
 
-### 🎯 **Usage**
-main_idea2video.py is used to convert your ideas into videos.
-You need to configure the model and API key information in the configs/idea2video.yaml file, including three parts—the chat model, the image generator, and the video generator, as shown below
+### 🎯 **使用方式**
+
+`main_idea2video.py` 用于把创意转换成视频。你需要在 `configs/idea2video.yaml` 中配置 model 与 API key 信息，包括 chat model、image generator 和 video generator 三部分，例如：
+
 ```yaml
 chat_model:
   init_args:
@@ -414,8 +419,9 @@ video_generator:
 working_dir: .working_dir/idea2video
 ```
 
-Then, provide a simple yet thoughtful idea and the corresponding creative requirements in main_idea2video.py.
-```bash
+然后在 `main_idea2video.py` 中提供简洁但有思考的创意，以及对应创作要求：
+
+```python
 idea = \
 """
 If a cat and a dog are best friends, what would happen when they meet a new cat?
@@ -427,8 +433,8 @@ For children, do not exceed 3 scenes.
 style = "Cartoon"
 ```
 
-main_script2video.py generates a video based on a specific script.
-You similarly need to set up the API configuration in configs/script2video.yaml file. Then, provide a scene script and the corresponding creative requirements in main_script2video.py, as shown below.
+`main_script2video.py` 会基于具体剧本生成视频。你同样需要先在 `configs/script2video.yaml` 中配置 API，然后在 `main_script2video.py` 中提供场景剧本和创作要求：
+
 ```python
 script = \
 """

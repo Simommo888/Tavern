@@ -114,7 +114,7 @@ OBS 页面会连接 SSE 事件流，收到主播回复后播放后端 TTS 音频
 - 后端 speech artifact 音频端点：`GET /api/live/sessions/{session_id}/speech/{artifact_id}/audio`
 - 默认使用 `edge-tts` 生成真实中文 MP3；失败或 `TAVERN_TTS_PROVIDER=placeholder` 时回退到静音 WAV 占位
 - Web 控制台展示状态、回复和事件日志
-- 前端优先播放后端 speech artifact 音频，失败时 fallback 到浏览器 Web Speech API 自动播报/重播主播回复
+- 前端优先播放后端 speech artifact 音频，失败时兜底使用浏览器 Web Speech API 自动播报/重播主播回复
 
 ## 后续扩展
 

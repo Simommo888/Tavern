@@ -1,6 +1,6 @@
-# ViMax local runtime configuration.
-# Secrets live in configs/agent.secrets.local.yaml (git-ignored) or environment variables.
-# Keep this tracked file free of real API keys.
+# ViMax 本地运行时配置。
+# 密钥应放在 configs/agent.secrets.local.yaml（已 git-ignore）或环境变量中。
+# 这个已跟踪文件不要写入真实 API key。
 
 llm:
   model_provider: openai
@@ -14,26 +14,26 @@ llm:
   network_access: enabled
   windows_wsl_setup_acknowledged: true
 
-# Image/video providers still need their own compatible API keys before full
-# rendering works. Leaving api_key empty makes ViMax read environment variables.
+# 图像/视频 providers 在完整渲染前仍需要各自的兼容 API keys。
+# api_key 留空时，ViMax 会读取环境变量。
 image:
   api_key: ''
 
-# Video agents use a dedicated Gemini/Veo-compatible provider. Secrets live in
-# configs/agent.secrets.local.yaml or GEMINI_API_KEY / VIMAX_VIDEO_API_KEY.
+# 视频 agents 使用独立的 Gemini/Veo-compatible provider。
+# 密钥放在 configs/agent.secrets.local.yaml 或 GEMINI_API_KEY / VIMAX_VIDEO_API_KEY 中。
 video:
   model: gemini-3.1-pro
   base_url: https://gpt.xinshu.ai
   api_key: ''
 
-# Optional real TTS provider. Defaults can be overridden with TAVERN_TTS_* env vars.
+# 可选真实 TTS provider。默认值可通过 TAVERN_TTS_* 环境变量覆盖。
 tts:
   model: tts-1
   voice: alloy
   base_url: https://gpt.xinshu.ai/v1
   api_key: ''
 
-# Optional. Fill these only when using novel2video planning.
+# 可选。仅在使用 novel2video planning 时填写。
 embedding:
   api_key: ''
 

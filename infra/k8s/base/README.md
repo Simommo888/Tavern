@@ -1,6 +1,6 @@
 # Tavern Kubernetes Base
 
-第一阶段仅保留 Kubernetes 部署边界说明，正式 manifests 在 Docker Compose 与 API/Web/Worker 稳定后补齐。
+第一阶段仅保留 Kubernetes 部署边界说明，正式 manifests 会在 Docker Compose 与 API/Web/Worker 稳定后补齐。
 
 计划资源：
 

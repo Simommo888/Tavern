@@ -1,11 +1,11 @@
-# legacy
+# legacy 目录
 
-Archived or compatibility-only material retained for reference while Tavern is refactored.
+这里保存归档或仅为兼容性保留的材料，供 Tavern 重构期间参考。
 
-Current legacy areas:
+当前 legacy 区域：
 
 ```text
-legacy/vimax/  # ViMax-era README, live-room MVP notes and branding assets
+legacy/vimax/  # ViMax 时代 README、直播间 MVP 说明和品牌资产
 ```
 
-Active runtime code is not moved here unless imports and tests can be safely updated in the same phase.
+除非能在同一阶段安全更新 imports 与 tests，否则活跃运行时代码不要移动到这里。

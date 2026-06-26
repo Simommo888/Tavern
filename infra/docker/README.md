@@ -1,6 +1,6 @@
 # Tavern Docker Compose
 
-Docker Compose is the Phase 10 local runtime contract for Tavern LiveOS. It uses the same environment variables as the backend `TavernSettings` object and keeps runtime state mounted in `.working_dir/`.
+Docker Compose 是 Tavern LiveOS Phase 10 的本地运行时契约。它使用与后端 `TavernSettings` 对象一致的环境变量，并把运行时状态挂载到 `.working_dir/`。
 
 ## 启动
 
@@ -12,7 +12,7 @@ docker compose -f infra/docker/docker-compose.yml --env-file infra/docker/.env.e
 
 - API: http://127.0.0.1:8770
 - API health: http://127.0.0.1:8770/health
-- API readiness: http://127.0.0.1:8770/ready
+- API 就绪检查: http://127.0.0.1:8770/ready
 - Web: http://127.0.0.1:5180
 - PostgreSQL: 127.0.0.1:5432
 - Redis: 127.0.0.1:6379
@@ -21,7 +21,7 @@ docker compose -f infra/docker/docker-compose.yml --env-file infra/docker/.env.e
 
 ## 统一配置
 
-`.env.example` mirrors the backend settings contract:
+`.env.example` 与后端 settings 契约保持一致：
 
 - `TAVERN_APP_NAME`
 - `TAVERN_ENV`
@@ -54,4 +54,4 @@ infra/docker/postgres/001_init.sql
 docker compose -f infra/docker/docker-compose.yml --profile workers up worker
 ```
 
-当前 worker 使用 file task queue 占位，后续会替换为 RabbitMQ consumer。
+当前 worker 使用 file task queue 占位，后续会替换为 RabbitMQ 消费者。

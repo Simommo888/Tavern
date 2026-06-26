@@ -1,5 +1,5 @@
-# packages
+# packages 目录
 
-Shared Python/TypeScript packages that should be reusable across apps, services, workers and tests.
+可在 apps、services、workers 和 tests 之间复用的共享 Python/TypeScript packages。
 
-Phase 2 only establishes this boundary. Move code here in later phases when a module is genuinely shared and no longer belongs to one app.
+Phase 2 只建立该边界。后续阶段只有当模块确实可共享、且不再属于某个单一 app 时，才移动到这里。

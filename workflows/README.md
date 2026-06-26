@@ -1,8 +1,8 @@
-# workflows
+# workflows 目录
 
-Workflow definitions, runners, node adapters, templates and visual workflow assets.
+Workflow definitions、runners、node adapters、templates 与可视化 workflow assets 的边界。
 
-Phase 5 establishes the canonical live-commerce workflow used by the API seed data and `/workflow` visual console:
+Phase 5 建立 API seed data 与 `/workflow` 可视化控制台使用的标准直播电商工作流：
 
 ```text
 商品
@@ -17,6 +17,6 @@ Phase 5 establishes the canonical live-commerce workflow used by the API seed da
   -> 推流
 ```
 
-The current implementation keeps the runner lightweight and data-driven: `WorkflowDefinition.nodes` describes the visual DAG, `WorkflowRun` tracks run-level state, and `WorkflowNodeRun` tracks node logs, cost, token usage, artifacts and handoff state.
+当前实现保持 runner 轻量且数据驱动：`WorkflowDefinition.nodes` 描述可视化 DAG，`WorkflowRun` 跟踪 run 级状态，`WorkflowNodeRun` 跟踪节点日志、成本、token 用量、产物与交接状态。
 
-Future runner/provider work should extend these contracts instead of adding duplicate workflow pipelines.
+后续 runner/provider 工作应扩展这些契约，而不是新增重复的 workflow pipelines。
