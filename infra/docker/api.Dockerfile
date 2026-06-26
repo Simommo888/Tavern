@@ -1,14 +1,17 @@
-FROM python:3.12-slim AS runtime
+FROM python:3.12-slim-bookworm AS runtime
 
-ENV PYTHONUNBUFFERED=1 \
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
     PYTHONUTF8=1 \
     PYTHONIOENCODING=utf-8
 
 WORKDIR /app
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends ffmpeg build-essential \
-    && rm -rf /var/lib/apt/lists/*
+RUN set -eux; \
+    printf 'Types: deb\nURIs: http://mirrors.tuna.tsinghua.edu.cn/debian\nSuites: bookworm bookworm-updates\nComponents: main\nSigned-By: /usr/share/keyrings/debian-archive-keyring.gpg\n\nTypes: deb\nURIs: http://mirrors.tuna.tsinghua.edu.cn/debian-security\nSuites: bookworm-security\nComponents: main\nSigned-By: /usr/share/keyrings/debian-archive-keyring.gpg\n' > /etc/apt/sources.list.d/debian.sources; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends ffmpeg build-essential; \
+    rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml uv.lock ./
 RUN pip install --no-cache-dir uv \

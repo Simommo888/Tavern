@@ -19,7 +19,7 @@ dependencies = [
     "openai>=1.95.0",
     "opencv-python",
     "pillow>=11.3.0",
-    "pywin32>=312",
+    "pywin32>=312; sys_platform == 'win32'",
     "pyyaml>=6.0.2",
     "requests>=2.32.4",
     "scenedetect[opencv]>=0.6.7.1",

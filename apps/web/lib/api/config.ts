@@ -1,7 +1,14 @@
-export const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? 'http://127.0.0.1:8770';
+const PUBLIC_API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? 'http://127.0.0.1:8770';
+
+export function apiBase(): string {
+  if (typeof window !== 'undefined') {
+    return PUBLIC_API_BASE;
+  }
+  return process.env.TAVERN_API_BASE_INTERNAL ?? PUBLIC_API_BASE;
+}
 
 export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await fetch(`${apiBase()}${path}`, {
     headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
     cache: 'no-store',
     ...init,
@@ -13,5 +20,5 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
 }
 
 export function absoluteApiUrl(path: string): string {
-  return `${API_BASE}${path}`;
+  return `${apiBase()}${path}`;
 }
