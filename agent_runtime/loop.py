@@ -162,6 +162,7 @@ def _openai_tool_call(call: ToolCall) -> dict[str, Any]:
 
 
 def build_runtime(workspace_root: str | Path = ".", llm: Any | None = None, adapter_specs: list[Any] | None = None) -> AgentLoop:
+    from .agent_company import build_default_agent_company
     from .heygen_skills import build_heygen_skill_specs
     from .production_adapters import build_production_adapter_specs
     from .vimax_adapters import build_vimax_adapter_specs
@@ -174,6 +175,7 @@ def build_runtime(workspace_root: str | Path = ".", llm: Any | None = None, adap
     ]
     registry = build_builtin_registry(root, session_index, specs)
     executor = ToolExecutor(registry, session_index)
-    prompt_builder = PromptBuilder(root / "prompts", session_index, registry)
+    agent_company = build_default_agent_company()
+    prompt_builder = PromptBuilder(root / "prompts", session_index, registry, agent_company)
     resolved_llm = llm or OpenAICompatibleLLM()
     return AgentLoop(session_index, prompt_builder, registry, executor, resolved_llm, ContextCompactor(resolved_llm))

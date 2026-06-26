@@ -1,5 +1,7 @@
 # Tavern Docker Compose
 
+Docker Compose is the Phase 10 local runtime contract for Tavern LiveOS. It uses the same environment variables as the backend `TavernSettings` object and keeps runtime state mounted in `.working_dir/`.
+
 ## 启动
 
 ```bash
@@ -9,11 +11,30 @@ docker compose -f infra/docker/docker-compose.yml --env-file infra/docker/.env.e
 ## 服务
 
 - API: http://127.0.0.1:8770
+- API health: http://127.0.0.1:8770/health
+- API readiness: http://127.0.0.1:8770/ready
 - Web: http://127.0.0.1:5180
 - PostgreSQL: 127.0.0.1:5432
 - Redis: 127.0.0.1:6379
 - RabbitMQ: http://127.0.0.1:15672
 - MinIO: http://127.0.0.1:9001
+
+## 统一配置
+
+`.env.example` mirrors the backend settings contract:
+
+- `TAVERN_APP_NAME`
+- `TAVERN_ENV`
+- `TAVERN_LOG_LEVEL`
+- `TAVERN_WORKSPACE_ROOT`
+- `TAVERN_STORAGE_BACKEND`
+- `TAVERN_TTS_PROVIDER`
+- `TAVERN_CORS_ORIGINS`
+- `DATABASE_URL`
+- `REDIS_URL`
+- `RABBITMQ_URL`
+- `MINIO_*`
+- `NEXT_PUBLIC_API_BASE`
 
 ## 数据库初始化
 

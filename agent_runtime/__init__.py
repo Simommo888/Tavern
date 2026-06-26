@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-__all__ = ["AgentLoop", "SessionIndex", "ToolRegistry", "build_runtime"]
+__all__ = ["AgentCompanyRegistry", "AgentLoop", "AgentRoleSpec", "SessionIndex", "ToolRegistry", "build_default_agent_company", "build_runtime"]
 
 
 def build_runtime(*args, **kwargs):
@@ -10,6 +10,18 @@ def build_runtime(*args, **kwargs):
 
 
 def __getattr__(name):
+    if name == "AgentCompanyRegistry":
+        from .agent_company import AgentCompanyRegistry
+
+        return AgentCompanyRegistry
+    if name == "AgentRoleSpec":
+        from .agent_company import AgentRoleSpec
+
+        return AgentRoleSpec
+    if name == "build_default_agent_company":
+        from .agent_company import build_default_agent_company
+
+        return build_default_agent_company
     if name == "AgentLoop":
         from .loop import AgentLoop
 

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import asyncio
+import tempfile
 import unittest
-from unittest.mock import MagicMock, patch
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from agent_runtime.llm import ModelGateway, OpenAICompatibleLLM, PromptRegistry, _claude_messages, _claude_tools
+from agent_runtime.llm import ModelGateway, OpenAICompatibleLLM, PromptRegistry, PromptTemplate, _claude_messages, _claude_tools
 
 
 class ModelGatewayTests(unittest.TestCase):
@@ -56,6 +59,28 @@ class ModelGatewayTests(unittest.TestCase):
         self.assertEqual(tools[0]["name"], "lookup_product")
         self.assertEqual(tools[0]["input_schema"]["additionalProperties"], False)
         self.assertEqual(tools[0]["input_schema"]["required"], ["sku"])
+
+    def test_prompt_registry_persists_custom_templates(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            registry = PromptRegistry(workspace_root=tmp)
+            registry.upsert(PromptTemplate(name="closing", system="sys", user_instruction="say bye", max_output_seconds=8))
+            restored = PromptRegistry(workspace_root=tmp)
+            messages = restored.render_messages("closing", {"room": "wine"})
+            self.assertEqual(messages[0]["content"], "sys")
+            self.assertIn("say bye", messages[1]["content"])
+            self.assertIn("8 秒以内", messages[1]["content"])
+            self.assertTrue((Path(tmp) / ".working_dir" / "model_gateway" / "prompt_templates.json").exists())
+
+    def test_openai_completion_passes_request_max_tokens(self):
+        async def run() -> None:
+            llm = OpenAICompatibleLLM(model="m", base_url="http://localhost:1", api_key="k", wire_api="chat_completions")
+            create = AsyncMock(return_value=MagicMock(choices=[MagicMock(message=MagicMock(content="ok", tool_calls=None, model_dump=MagicMock(return_value={})))]))
+            llm.client = MagicMock(chat=MagicMock(completions=MagicMock(create=create)))
+            result = await llm.complete([{"role": "user", "content": "x"}], tools=[], max_tokens=123)
+            self.assertEqual(result.text, "ok")
+            self.assertEqual(create.await_args.kwargs["max_tokens"], 123)
+
+        asyncio.run(run())
 
 
 if __name__ == "__main__":

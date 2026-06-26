@@ -65,9 +65,101 @@ class WorkbenchApiTests(unittest.TestCase):
             self.assertEqual(rules.status_code, 200)
             self.assertGreaterEqual(len(rules.json()["rules"]), 3)
 
+            definitions = client.get("/api/v1/workflow/definitions")
+            self.assertEqual(definitions.status_code, 200)
+            workflow = definitions.json()["definitions"][0]
+            self.assertEqual([node["label"] for node in workflow["nodes"]], ["商品", "品牌", "故事", "剧本", "分镜", "语音", "数字人", "直播间", "视频", "推流"])
+            self.assertEqual(workflow["nodes"][-1]["id"], "streaming")
+            self.assertEqual(workflow["edges"][-1], {"source": "video", "target": "streaming", "type": "handoff"})
+
+            runs = client.get("/api/v1/workflow/runs")
+            self.assertEqual(runs.status_code, 200)
+            run = runs.json()["runs"][0]
+            nodes = client.get(f"/api/v1/workflow/runs/{run['workflow_run_id']}/nodes")
+            self.assertEqual(nodes.status_code, 200)
+            self.assertEqual([node["node_id"] for node in nodes.json()["nodes"]], ["product", "brand", "story", "script", "storyboard", "voice", "avatar", "live_room", "video", "streaming"])
+
+            assets = client.get("/api/v1/assets")
+            self.assertEqual(assets.status_code, 200)
+            self.assertIn("uuid", assets.json()["assets"][0])
+            self.assertIn("version", assets.json()["assets"][0])
+
+            components = client.get("/api/v1/components")
+            self.assertEqual(components.status_code, 200)
+            component = components.json()["components"][0]
+            self.assertIn("uuid", component)
+            self.assertIn("source_asset_ids", component)
+            self.assertIn("metadata", component)
+
+            scenes = client.get("/api/v1/scenes")
+            self.assertEqual(scenes.status_code, 200)
+            scene = scenes.json()["scenes"][0]
+            self.assertIn("uuid", scene)
+            self.assertIn("component_slots", scene)
+            self.assertGreaterEqual(len(scene["component_ids"]), 1)
+            self.assertEqual(scene["metadata"]["contract"], "Asset -> Component -> Scene -> LiveRoom")
+
+            live_rooms = client.get("/api/v1/live-room-compositions")
+            self.assertEqual(live_rooms.status_code, 200)
+            live_room = live_rooms.json()["compositions"][0]
+            self.assertIn(scene["scene_id"], live_room["scene_ids"])
+            self.assertGreaterEqual(len(live_room["scene_snapshot"]), 1)
+            self.assertEqual(live_room["metadata"]["contract"], "Asset -> Component -> Scene -> LiveRoom")
+
             metrics = client.get("/api/v1/platform/metrics")
             self.assertEqual(metrics.status_code, 200)
             self.assertGreater(metrics.json()["metrics"][0]["gmv"], 0)
+
+            analytics = client.get("/api/v1/analytics/overview")
+            self.assertEqual(analytics.status_code, 200)
+            overview = analytics.json()
+            self.assertGreater(overview["summary"]["gmv"], 0)
+            self.assertGreater(overview["summary"]["ctr"], 0)
+            self.assertGreater(overview["summary"]["cvr"], 0)
+            self.assertEqual(overview["top_ranking"][0]["rank"], 1)
+            self.assertIn("score", overview["top_ranking"][0])
+            self.assertGreaterEqual(len(overview["component_ranking"]), 1)
+            self.assertGreaterEqual(len(overview["prompt_ranking"]), 1)
+            self.assertGreaterEqual(len(overview["avatar_ranking"]), 1)
+            self.assertGreaterEqual(len(overview["best_practice_ranking"]), 1)
+
+    def test_phase_nine_mvp_api_runs_product_to_saved_live_plan(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            workbench_module._service = WorkbenchService(Path(tmp))
+            client = TestClient(create_app())
+
+            response = client.post("/api/v1/mvp/live-plans/run", json={
+                "brand_name": "龙八",
+                "product": {
+                    "product_name": "龙八礼盒",
+                    "sku": "LB-MVP-001",
+                    "price": 299,
+                    "original_price": 399,
+                    "aroma_type": "酱香",
+                    "selling_points": ["宴请送礼", "礼盒包装", "直播权益"],
+                    "scenes": ["商务宴请", "节日拜访"],
+                },
+            })
+            self.assertEqual(response.status_code, 200)
+            plan = response.json()["plan"]
+            self.assertEqual(plan["status"], "succeeded")
+            self.assertEqual([step["label"] for step in plan["steps"]], ["上传商品", "品牌分析", "剧本", "数字人口播", "数字人", "直播视频", "保存方案"])
+            self.assertIn("live_video_uri", plan)
+            self.assertEqual(plan["brand_analysis"]["brand_name"], "龙八")
+            self.assertTrue(plan["script_snapshot"]["content"].startswith("大家好"))
+            self.assertEqual(plan["saved_outputs"]["live_room_composition_id"], plan["live_room_composition_id"])
+
+            listed = client.get("/api/v1/mvp/live-plans")
+            self.assertEqual(listed.status_code, 200)
+            self.assertEqual(listed.json()["plans"][0]["plan_id"], plan["plan_id"])
+
+            definitions = client.get("/api/v1/workflow/definitions")
+            mvp_definition = next(item for item in definitions.json()["definitions"] if item["version"] == "phase9-v1")
+            self.assertEqual([node["label"] for node in mvp_definition["nodes"]], ["上传商品", "品牌分析", "剧本", "数字人口播", "数字人", "直播视频", "保存方案"])
+
+            nodes = client.get(f"/api/v1/workflow/runs/{plan['workflow_run_id']}/nodes")
+            self.assertEqual(nodes.status_code, 200)
+            self.assertEqual([node["status"] for node in nodes.json()["nodes"]], ["succeeded"] * 7)
 
     def test_rag_model_avatar_and_platform_apis(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -78,9 +170,11 @@ class WorkbenchApiTests(unittest.TestCase):
             self.assertEqual(documents.status_code, 200)
             self.assertEqual(documents.json()["documents"][0]["status"], "indexed")
 
-            search = client.post("/api/v1/knowledge/search", json={"query": "送礼 商务宴请"})
+            search = client.post("/api/v1/knowledge/search", json={"query": "送礼 商务宴请", "limit": 3})
             self.assertEqual(search.status_code, 200)
             self.assertTrue(search.json()["chunks"])
+            self.assertGreater(search.json()["results"][0]["score"], 0)
+            self.assertIn("matched_terms", search.json()["results"][0])
 
             providers = client.get("/api/v1/model-gateway/providers")
             self.assertEqual(providers.status_code, 200)
@@ -129,6 +223,14 @@ class WorkbenchApiTests(unittest.TestCase):
         result = LiveAnchorGraph().run({"event_text": "喝了是不是养生？", "product_context": {"product_name": "测试酒"}})
         self.assertEqual(result["intent"], "compliance_risk")
         self.assertIn("不能宣传养生", result["final_reply"])
+
+    def test_live_anchor_graph_retrieves_product_knowledge(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            workbench = WorkbenchService(Path(tmp))
+            product = workbench.products.list()[0]
+            result = LiveAnchorGraph(workbench=workbench).run({"event_text": "适合送领导吗？", "product_context": product.model_dump()})
+            self.assertTrue(result["retrieved_chunks"])
+            self.assertIn("送领导", result["retrieved_chunks"][0]["text"])
 
 
 if __name__ == "__main__":

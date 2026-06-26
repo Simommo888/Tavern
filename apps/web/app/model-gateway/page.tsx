@@ -1,33 +1,49 @@
 import WorkbenchShell from '@/components/live/WorkbenchShell';
-import { listModelProviders, listPromptTemplates } from '@/lib/api/workbench';
+import PageHero from '@/components/ui/PageHero';
+import StatusBadge from '@/components/ui/StatusBadge';
+import { listModelProviders, listPluginProviders, listPromptTemplates } from '@/lib/api/workbench';
 
 export default async function ModelGatewayPage() {
-  const providers = await listModelProviders();
-  const prompts = await listPromptTemplates();
+  const [providers, prompts, plugins] = await Promise.all([listModelProviders(), listPromptTemplates(), listPluginProviders()]);
   return (
     <WorkbenchShell>
       <div className="page">
-        <header className="hero">
-          <div>
-            <p className="eyebrow">Model Gateway</p>
-            <h1>统一模型网关</h1>
-            <p>统一管理 Gemini、Claude、GPT 与 OpenAI-compatible 模型，支持模型切换、流式输出和 Prompt 版本管理。</p>
-          </div>
-        </header>
-        <section className="grid">
+        <PageHero
+          eyebrow="Model & Plugin Manager"
+          title="统一模型网关与插件 Provider"
+          description="LLM、TTS、数字人、视频合成、推流和工作流全部通过 Provider Adapter 接入，今天用 Fish Speech，明天换 ElevenLabs，不改业务链路。"
+          action={<button>添加 Provider</button>}
+        />
+        <section className="grid three">
           {providers.map((provider) => (
             <article key={provider.provider_id} className="card">
-              <h2>{provider.display_name}</h2>
+              <div className="card-row">
+                <h2>{provider.display_name}</h2>
+                <StatusBadge status={provider.configured ? 'ready' : 'queued'} />
+              </div>
               <dl>
-                <dt>Provider</dt><dd>{provider.name}</dd>
-                <dt>Chat</dt><dd>{provider.chat_model || '-'}</dd>
-                <dt>Embedding</dt><dd>{provider.embedding_model || '-'}</dd>
-                <dt>Streaming</dt><dd>{provider.streaming_supported ? '支持' : '不支持'}</dd>
-                <dt>配置</dt><dd>{provider.configured ? '已配置' : '待配置'}</dd>
+                <div><dt>Provider</dt><dd>{provider.name}</dd></div>
+                <div><dt>Chat</dt><dd>{provider.chat_model || '-'}</dd></div>
+                <div><dt>Embedding</dt><dd>{provider.embedding_model || '-'}</dd></div>
+                <div><dt>Streaming</dt><dd>{provider.streaming_supported ? '支持' : '不支持'}</dd></div>
               </dl>
             </article>
           ))}
-          <article className="card wide">
+        </section>
+        <section className="grid" style={{ marginTop: 20 }}>
+          <article className="card">
+            <h2>插件 Provider Registry</h2>
+            <div className="timeline">
+              {plugins.map((plugin) => (
+                <article key={plugin.plugin_id} className="reply">
+                  <span>{plugin.category} · {plugin.source_type}</span>
+                  <p>{plugin.display_name}</p>
+                  <small>{plugin.provider_id} · {plugin.health_status} · {plugin.capabilities.join(' / ')}</small>
+                </article>
+              ))}
+            </div>
+          </article>
+          <article className="card">
             <h2>Prompt 管理</h2>
             <div className="timeline">
               {prompts.map((prompt) => (

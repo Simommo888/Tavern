@@ -4,26 +4,33 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from apps.api.app.api.v1.router import api_router
+from apps.api.app.core.logging import configure_logging, get_logger
+from apps.api.app.core.settings import get_settings
+
+logger = get_logger(__name__)
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="Tavern AI Live Workbench API", version="0.1.0")
+    settings = get_settings()
+    configure_logging(settings)
+    app = FastAPI(title=f"{settings.app_name} API", version=settings.version)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=list(settings.cors_origins),
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
     app.include_router(api_router)
+    logger.info("Tavern API initialized", extra={"environment": settings.environment, "storage_backend": settings.storage_backend})
 
     @app.get("/health")
     def health() -> dict[str, str]:
-        return {"status": "ok"}
+        return settings.public_health()
 
     @app.get("/ready")
     def ready() -> dict[str, str]:
-        return {"status": "ready"}
+        return settings.readiness()
 
     return app
 

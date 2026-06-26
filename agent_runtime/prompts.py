@@ -16,14 +16,23 @@ class PromptPart:
 
 
 class PromptBuilder:
-    def __init__(self, prompt_dir: str | Path, session_index: Any, tool_registry: Any) -> None:
+    def __init__(self, prompt_dir: str | Path, session_index: Any, tool_registry: Any, agent_company: Any | None = None) -> None:
         self.prompt_dir = Path(prompt_dir)
         self.session_index = session_index
         self.tool_registry = tool_registry
+        if agent_company is None:
+            try:
+                from .agent_company import build_default_agent_company
+
+                agent_company = build_default_agent_company()
+            except Exception:
+                agent_company = None
+        self.agent_company = agent_company
 
     def build_parts(self, user_input: str) -> list[PromptPart]:
         return [
             PromptPart("agent.core", "Agent", self._read_prompt("agent.md"), "stable", "agent", True),
+            PromptPart("agent.company", "Agent Company", self.agent_company_context(user_input), "stable", "agent_company", True),
             PromptPart("workflow.core", "Workflow", self._read_prompt("workflow.md"), "stable", "workflow", True),
             PromptPart("tool.manifest", "Tools", self.tool_manifest_context(), "dynamic", "tooling"),
             PromptPart("session.context", "Session", self.workflow_context(), "dynamic", "session"),
@@ -75,6 +84,22 @@ class PromptBuilder:
     def memory_context(self) -> str:
         text = self.session_index.memory_text().strip()
         return text or "No user preferences recorded."
+
+    def agent_company_context(self, user_input: str) -> str:
+        if self.agent_company is None:
+            return "No Agent Company registry configured."
+        lines = [
+            "Phase 4 Agent Company registry is active.",
+            "Use it to pick the responsible role and maintain Prompt/Memory/Tool/Workflow/MCP boundaries.",
+            "Do not start Phase 5 workflow execution unless the user explicitly asks for the next phase.",
+            "",
+        ]
+        if hasattr(self.agent_company, "route_context"):
+            lines.append(self.agent_company.route_context(user_input, self.tool_registry))
+            lines.append("")
+        if hasattr(self.agent_company, "structure_context"):
+            lines.append(self.agent_company.structure_context())
+        return "\n".join(lines).strip()
 
     def tool_manifest_context(self) -> str:
         lines = ["Available tools:"]

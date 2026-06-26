@@ -293,30 +293,21 @@ erDiagram
 ```text
 D:/Tavern
   apps/
-    api/
-      app/
-        main.py
-        api/v1/
-        application/
-        domain/
-        infrastructure/
-        agents/
-        schemas/
-        workers/
-    web/
-      app/
-      components/
-      hooks/
-      lib/
-      types/
+    api/               # FastAPI backend
+    web/               # Next.js LiveOS console
+  packages/            # shared domain/config/testing packages
+  services/            # model, TTS, avatar, video, RAG, streaming, analytics boundaries
+  plugins/             # plugin interfaces, manager, loader and providers
+  workers/             # background workers
+  agents/              # active agent code; Agent Company refactor happens later
+  workflows/           # workflow definitions, runners, nodes and visual assets
+  components/          # reusable composition/UI component boundary
+  assets/              # Tavern-owned raw/processed/generated assets
+  shared/              # cross-runtime shared types/constants/utilities
+  legacy/              # archived ViMax-era documentation and deprecated assets
+  third_party/         # external OSS integrations tracked by manifest
   docs/
-    architecture/
-    api/
   infra/
-    docker/
-    k8s/
-  agent_runtime/       # legacy + reusable implementations
-  web/                 # legacy Vite MVP
   tests/
 ```
 

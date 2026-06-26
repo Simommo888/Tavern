@@ -1,0 +1,38 @@
+[
+  {
+    "name": "fish-speech",
+    "repo_url": "https://github.com/fishaudio/fish-speech",
+    "commit": "",
+    "license": "Apache-2.0",
+    "purpose": "TTS and voice cloning provider for Voice Agent",
+    "adapter": "apps/api/app/plugins/tts",
+    "status": "candidate_not_cloned"
+  },
+  {
+    "name": "LiveTalking",
+    "repo_url": "https://github.com/lipku/LiveTalking",
+    "commit": "",
+    "license": "check_before_commercial_use",
+    "purpose": "Realtime digital human provider for Avatar Agent",
+    "adapter": "apps/api/app/plugins/avatar",
+    "status": "candidate_not_cloned"
+  },
+  {
+    "name": "MuseTalk",
+    "repo_url": "https://github.com/TMElyralab/MuseTalk",
+    "commit": "",
+    "license": "check_before_commercial_use",
+    "purpose": "Audio-driven lip-sync provider for Avatar Agent",
+    "adapter": "apps/api/app/plugins/avatar",
+    "status": "candidate_not_cloned"
+  },
+  {
+    "name": "SadTalker",
+    "repo_url": "https://github.com/OpenTalker/SadTalker",
+    "commit": "",
+    "license": "check_before_commercial_use",
+    "purpose": "Talking-head fallback provider for Avatar Agent",
+    "adapter": "apps/api/app/plugins/avatar",
+    "status": "candidate_not_cloned"
+  }
+]

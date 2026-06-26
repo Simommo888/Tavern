@@ -1,8 +1,8 @@
 [project]
-name = "autolongvideogeneration"
-version = "1.1.0"
-description = "Add your description here"
-readme = "readme.md"
+name = "tavern-liveos"
+version = "0.2.0"
+description = "AI Digital Live Commerce Operating System"
+readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "aiohttp>=3.12.14",

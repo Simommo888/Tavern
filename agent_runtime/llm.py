@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, AsyncIterator, Literal
 from uuid import uuid4
 
@@ -48,14 +49,21 @@ class PromptTemplate:
 
 
 class PromptRegistry:
-    def __init__(self, templates: dict[str, PromptTemplate] | None = None) -> None:
+    def __init__(self, templates: dict[str, PromptTemplate] | None = None, workspace_root: str | Path = ".") -> None:
+        self.workspace_root = Path(workspace_root).resolve()
         self.templates = templates or _default_prompt_templates()
+        self.templates.update(self._load_templates())
 
     def get(self, name: str) -> PromptTemplate:
         try:
             return self.templates[name]
         except KeyError as exc:
             raise KeyError(f"Unknown prompt template: {name}") from exc
+
+    def upsert(self, template: PromptTemplate) -> PromptTemplate:
+        self.templates[template.name] = template
+        self._save_templates()
+        return template
 
     def render_messages(self, name: str, payload: dict[str, Any]) -> list[dict[str, Any]]:
         template = self.get(name)
@@ -66,6 +74,40 @@ class PromptRegistry:
             {"role": "system", "content": template.system},
             {"role": "user", "content": json.dumps({"instruction": instruction, "payload": payload}, ensure_ascii=False)},
         ]
+
+    def _load_templates(self) -> dict[str, PromptTemplate]:
+        path = self._template_path()
+        if not path.exists():
+            return {}
+        data = json.loads(path.read_text(encoding="utf-8") or "[]")
+        templates: dict[str, PromptTemplate] = {}
+        for item in data:
+            template = PromptTemplate(
+                name=str(item["name"]),
+                system=str(item["system"]),
+                user_instruction=str(item["user_instruction"]),
+                max_output_seconds=item.get("max_output_seconds"),
+            )
+            templates[template.name] = template
+        return templates
+
+    def _save_templates(self) -> None:
+        path = self._template_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        custom = [template for name, template in self.templates.items() if name not in _default_prompt_templates()]
+        data = [
+            {
+                "name": template.name,
+                "system": template.system,
+                "user_instruction": template.user_instruction,
+                "max_output_seconds": template.max_output_seconds,
+            }
+            for template in sorted(custom, key=lambda item: item.name)
+        ]
+        path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    def _template_path(self) -> Path:
+        return self.workspace_root / ".working_dir" / "model_gateway" / "prompt_templates.json"
 
 
 class ModelGateway:
@@ -84,14 +126,14 @@ class ModelGateway:
         self.api_key = api_key or llm_api_key(workspace_root)
         self.wire_api = (wire_api or llm_wire_api(workspace_root)).strip().lower()
         if not self.api_key:
-            raise RuntimeError("VIMAX_LLM_API_KEY is required for the model gateway")
-        self.prompt_registry = PromptRegistry()
+            raise RuntimeError("TAVERN_LLM_API_KEY or VIMAX_LLM_API_KEY is required for the model gateway")
+        self.prompt_registry = PromptRegistry(workspace_root=workspace_root)
         self.client = self._build_client()
 
-    async def complete(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> AssistantMessage:
+    async def complete(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]], max_tokens: int | None = None, effort: str | None = None) -> AssistantMessage:
         for attempt in range(LLM_MAX_ATTEMPTS):
             try:
-                return await self._complete_once(messages, tools)
+                return await self._complete_once(messages, tools, max_tokens=max_tokens, effort=effort)
             except Exception as exc:
                 if attempt == LLM_MAX_ATTEMPTS - 1 or not _is_retryable_llm_error(exc):
                     raise
@@ -100,27 +142,27 @@ class ModelGateway:
                 await asyncio.sleep(delay)
         raise RuntimeError("LLM call failed after retries")
 
-    async def stream_complete(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> AsyncIterator[str]:
+    async def stream_complete(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]], max_tokens: int | None = None, effort: str | None = None) -> AsyncIterator[str]:
         if self.provider == "claude":
-            async for chunk in self._stream_claude(messages, tools):
+            async for chunk in self._stream_claude(messages, tools, max_tokens=max_tokens, effort=effort):
                 yield chunk
             return
         if self.provider == "gemini":
             async for chunk in self._stream_gemini(messages):
                 yield chunk
             return
-        async for chunk in self._stream_openai(messages, tools):
+        async for chunk in self._stream_openai(messages, tools, max_tokens=max_tokens):
             yield chunk
 
     async def complete_prompt(self, template_name: str, payload: dict[str, Any]) -> AssistantMessage:
         return await self.complete(self.prompt_registry.render_messages(template_name, payload), tools=[])
 
-    async def _complete_once(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> AssistantMessage:
+    async def _complete_once(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]], max_tokens: int | None = None, effort: str | None = None) -> AssistantMessage:
         if self.provider == "claude":
-            return await self._complete_claude(messages, tools)
+            return await self._complete_claude(messages, tools, max_tokens=max_tokens, effort=effort)
         if self.provider == "gemini":
             return await self._complete_gemini(messages)
-        return await self._complete_openai(messages, tools)
+        return await self._complete_openai(messages, tools, max_tokens=max_tokens)
 
     def _build_client(self) -> Any:
         if self.provider == "claude":
@@ -137,23 +179,27 @@ class ModelGateway:
             return genai.Client(api_key=self.api_key)
         return AsyncOpenAI(api_key=self.api_key, base_url=self.base_url, timeout=LLM_REQUEST_TIMEOUT_SECONDS)
 
-    async def _complete_openai(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> AssistantMessage:
-        response = await self._create_openai_response(messages, tools)
+    async def _complete_openai(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]], max_tokens: int | None = None) -> AssistantMessage:
+        response = await self._create_openai_response(messages, tools, max_tokens=max_tokens)
         if self.wire_api == "responses":
             return _assistant_message_from_responses(response)
         return _assistant_message_from_chat_completion(response)
 
-    async def _create_openai_response(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> Any:
+    async def _create_openai_response(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]], max_tokens: int | None = None) -> Any:
         if self.wire_api == "responses":
-            return await self.client.responses.create(
-                model=self.model,
-                input=_responses_input(messages),
-                tools=_responses_tools(tools),
-            )
-        return await self.client.chat.completions.create(model=self.model, messages=messages, tools=tools or None, tool_choice="auto" if tools else None)
+            request = {
+                "model": self.model,
+                "input": _responses_input(messages),
+                "tools": _responses_tools(tools),
+                "max_output_tokens": max_tokens,
+            }
+            return await self.client.responses.create(**{key: value for key, value in request.items() if value is not None})
+        request = {"model": self.model, "messages": messages, "tools": tools or None, "tool_choice": "auto" if tools else None, "max_tokens": max_tokens}
+        return await self.client.chat.completions.create(**{key: value for key, value in request.items() if value is not None})
 
-    async def _stream_openai(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> AsyncIterator[str]:
-        stream = await self.client.chat.completions.create(model=self.model, messages=messages, tools=tools or None, tool_choice="auto" if tools else None, stream=True)
+    async def _stream_openai(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]], max_tokens: int | None = None) -> AsyncIterator[str]:
+        request = {"model": self.model, "messages": messages, "tools": tools or None, "tool_choice": "auto" if tools else None, "max_tokens": max_tokens, "stream": True}
+        stream = await self.client.chat.completions.create(**{key: value for key, value in request.items() if value is not None})
         async for event in stream:
             if not event.choices:
                 continue
@@ -161,35 +207,35 @@ class ModelGateway:
             if delta:
                 yield delta
 
-    async def _complete_claude(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> AssistantMessage:
+    async def _complete_claude(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]], max_tokens: int | None = None, effort: str | None = None) -> AssistantMessage:
         system, claude_messages = _claude_messages(messages)
         request: dict[str, Any] = {
             "model": self.model,
-            "max_tokens": 16000,
+            "max_tokens": max_tokens or 16000,
             "system": system,
             "messages": claude_messages,
             "tools": _claude_tools(tools) or None,
         }
-        if self.model.startswith("claude-opus-4") or self.model.startswith("claude-sonnet-4-6"):
+        if _supports_adaptive_thinking(self.model):
             request["thinking"] = {"type": "adaptive"}
-            request["output_config"] = {"effort": "high"}
+            request["output_config"] = {"effort": effort or "high"}
         response = await self.client.messages.create(**{key: value for key, value in request.items() if value is not None})
         if response.stop_reason == "refusal":
             raise RuntimeError("Claude refused the request")
         return _assistant_message_from_claude(response)
 
-    async def _stream_claude(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> AsyncIterator[str]:
+    async def _stream_claude(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]], max_tokens: int | None = None, effort: str | None = None) -> AsyncIterator[str]:
         system, claude_messages = _claude_messages(messages)
         request: dict[str, Any] = {
             "model": self.model,
-            "max_tokens": 64000,
+            "max_tokens": max_tokens or 64000,
             "system": system,
             "messages": claude_messages,
             "tools": _claude_tools(tools) or None,
         }
-        if self.model.startswith("claude-opus-4") or self.model.startswith("claude-sonnet-4-6"):
+        if _supports_adaptive_thinking(self.model):
             request["thinking"] = {"type": "adaptive"}
-            request["output_config"] = {"effort": "high"}
+            request["output_config"] = {"effort": effort or "high"}
         async with self.client.messages.stream(**{key: value for key, value in request.items() if value is not None}) as stream:
             async for text in stream.text_stream:
                 if text:
@@ -218,6 +264,10 @@ class OpenAICompatibleLLM(ModelGateway):
 
 class UnifiedModelGateway(ModelGateway):
     pass
+
+
+def _supports_adaptive_thinking(model: str) -> bool:
+    return model.startswith("claude-opus-4") or model.startswith("claude-sonnet-4-6")
 
 
 def _normalize_provider(provider: str) -> ModelProvider:

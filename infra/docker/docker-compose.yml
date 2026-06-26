@@ -4,16 +4,22 @@ services:
       context: ../..
       dockerfile: infra/docker/api.Dockerfile
     environment:
-      PYTHONPATH: /app
-      PYTHONUTF8: "1"
-      PYTHONIOENCODING: utf-8
-      TAVERN_TTS_PROVIDER: placeholder
-      DATABASE_URL: postgresql://tavern:tavern@postgres:5432/tavern
-      REDIS_URL: redis://redis:6379/0
-      RABBITMQ_URL: amqp://tavern:tavern@rabbitmq:5672/
-      MINIO_ENDPOINT: http://minio:9000
-      MINIO_ACCESS_KEY: tavern
-      MINIO_SECRET_KEY: tavern-secret
+      PYTHONPATH: ${PYTHONPATH:-/app}
+      PYTHONUTF8: "${PYTHONUTF8:-1}"
+      PYTHONIOENCODING: ${PYTHONIOENCODING:-utf-8}
+      TAVERN_APP_NAME: ${TAVERN_APP_NAME:-Tavern LiveOS}
+      TAVERN_ENV: ${TAVERN_ENV:-docker}
+      TAVERN_LOG_LEVEL: ${TAVERN_LOG_LEVEL:-INFO}
+      TAVERN_WORKSPACE_ROOT: ${TAVERN_WORKSPACE_ROOT:-/app}
+      TAVERN_STORAGE_BACKEND: ${TAVERN_STORAGE_BACKEND:-file}
+      TAVERN_TTS_PROVIDER: ${TAVERN_TTS_PROVIDER:-placeholder}
+      TAVERN_CORS_ORIGINS: "${TAVERN_CORS_ORIGINS:-*}"
+      DATABASE_URL: ${DATABASE_URL:-postgresql://tavern:tavern@postgres:5432/tavern}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://tavern:tavern@rabbitmq:5672/}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://minio:9000}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-tavern}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-tavern-secret}
     ports:
       - "8770:8770"
     depends_on:
@@ -29,7 +35,7 @@ services:
       context: ../..
       dockerfile: infra/docker/web.Dockerfile
     environment:
-      NEXT_PUBLIC_API_BASE: http://127.0.0.1:8770
+      NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE:-http://127.0.0.1:8770}
     ports:
       - "5180:5180"
     depends_on:
@@ -41,11 +47,15 @@ services:
       dockerfile: infra/docker/api.Dockerfile
     command: ["uv", "run", "python", "-m", "apps.api.app.workers.main"]
     environment:
-      PYTHONPATH: /app
-      DATABASE_URL: postgresql://tavern:tavern@postgres:5432/tavern
-      REDIS_URL: redis://redis:6379/0
-      RABBITMQ_URL: amqp://tavern:tavern@rabbitmq:5672/
-      MINIO_ENDPOINT: http://minio:9000
+      PYTHONPATH: ${PYTHONPATH:-/app}
+      TAVERN_ENV: ${TAVERN_ENV:-docker}
+      TAVERN_LOG_LEVEL: ${TAVERN_LOG_LEVEL:-INFO}
+      TAVERN_WORKSPACE_ROOT: ${TAVERN_WORKSPACE_ROOT:-/app}
+      TAVERN_STORAGE_BACKEND: ${TAVERN_STORAGE_BACKEND:-file}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://tavern:tavern@postgres:5432/tavern}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://tavern:tavern@rabbitmq:5672/}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://minio:9000}
     depends_on:
       - postgres
       - redis
@@ -57,9 +67,9 @@ services:
   postgres:
     image: postgres:16
     environment:
-      POSTGRES_DB: tavern
-      POSTGRES_USER: tavern
-      POSTGRES_PASSWORD: tavern
+      POSTGRES_DB: ${POSTGRES_DB:-tavern}
+      POSTGRES_USER: ${POSTGRES_USER:-tavern}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tavern}
     ports:
       - "5432:5432"
     volumes:
@@ -74,8 +84,8 @@ services:
   rabbitmq:
     image: rabbitmq:3-management
     environment:
-      RABBITMQ_DEFAULT_USER: tavern
-      RABBITMQ_DEFAULT_PASS: tavern
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-tavern}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-tavern}
     ports:
       - "5672:5672"
       - "15672:15672"
@@ -84,8 +94,8 @@ services:
     image: minio/minio:latest
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: tavern
-      MINIO_ROOT_PASSWORD: tavern-secret
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-tavern}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-tavern-secret}
     ports:
       - "9000:9000"
       - "9001:9001"

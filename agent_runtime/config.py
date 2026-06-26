@@ -63,26 +63,23 @@ def config_value(section: str, key: str, env_names: list[str], default: str = ""
 
 
 def llm_model(workspace_root: str | Path = ".") -> str:
-    return config_value("llm", "model", ["VIMAX_LLM_MODEL"], DEFAULT_LLM_MODEL, workspace_root)
+    return config_value("llm", "model", ["TAVERN_LLM_MODEL", "VIMAX_LLM_MODEL"], DEFAULT_LLM_MODEL, workspace_root)
 
 
 def llm_model_provider(workspace_root: str | Path = ".") -> str:
-    return config_value("llm", "model_provider", ["VIMAX_LLM_MODEL_PROVIDER"], DEFAULT_LLM_MODEL_PROVIDER, workspace_root)
+    return config_value("llm", "model_provider", ["TAVERN_LLM_MODEL_PROVIDER", "VIMAX_LLM_MODEL_PROVIDER"], DEFAULT_LLM_MODEL_PROVIDER, workspace_root)
 
 
 def llm_base_url(workspace_root: str | Path = ".") -> str:
-    return config_value("llm", "base_url", ["VIMAX_LLM_BASE_URL"], DEFAULT_LLM_BASE_URL, workspace_root)
+    return config_value("llm", "base_url", ["TAVERN_LLM_BASE_URL", "VIMAX_LLM_BASE_URL"], DEFAULT_LLM_BASE_URL, workspace_root)
 
 
 def llm_wire_api(workspace_root: str | Path = ".") -> str:
-    return config_value("llm", "wire_api", ["VIMAX_LLM_WIRE_API"], "chat_completions", workspace_root)
+    return config_value("llm", "wire_api", ["TAVERN_LLM_WIRE_API", "VIMAX_LLM_WIRE_API"], "chat_completions", workspace_root)
 
 
 def llm_api_key(workspace_root: str | Path = ".") -> str:
-    # VIMAX_LLM_API_KEY is an explicit project override. Generic OPENAI_API_KEY is
-    # only a fallback so unrelated shell/global OpenAI keys do not override
-    # configs/agent.secrets.local.yaml for this project.
-    explicit = os.environ.get("VIMAX_LLM_API_KEY")
+    explicit = os.environ.get("TAVERN_LLM_API_KEY") or os.environ.get("VIMAX_LLM_API_KEY")
     if explicit:
         return explicit
     section_payload = load_agent_config(workspace_root).get("llm", {})

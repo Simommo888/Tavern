@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+from apps.api.app.core.logging import get_logger
 from apps.api.app.domain.live.entities import AnchorReply, SpeechArtifact
 from apps.api.app.infrastructure.repositories.file_live import FileLiveRoomRepository
 from agent_runtime.speech_tts import synthesize_speech
+
+logger = get_logger(__name__)
 
 
 class SpeechService:
@@ -17,4 +20,5 @@ class SpeechService:
         speech.mime_type = mime_type
         speech.provider = provider
         self.repository.save_speech_artifact(speech)
+        logger.info("Speech artifact created", extra={"session_id": reply.session_id, "provider": provider, "artifact_id": speech.artifact_id})
         return speech

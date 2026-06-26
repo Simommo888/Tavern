@@ -1,5 +1,6 @@
 import WorkbenchShell from '@/components/live/WorkbenchShell';
 import KnowledgeCenter from '@/components/live/KnowledgeCenter';
+import PageHero from '@/components/ui/PageHero';
 import { listKnowledgeDocuments, searchKnowledge } from '@/lib/api/workbench';
 
 export default async function KnowledgePage() {
@@ -8,14 +9,12 @@ export default async function KnowledgePage() {
   return (
     <WorkbenchShell>
       <div className="page">
-        <header className="hero">
-          <div>
-            <p className="eyebrow">Product RAG</p>
-            <h1>商品知识库</h1>
-            <p>支持 PDF、Word、Excel、CSV 自动切片、向量化和知识检索，回复前经过酒类合规过滤。</p>
-          </div>
-          <button>上传资料</button>
-        </header>
+        <PageHero
+          eyebrow="Knowledge Base"
+          title="企业知识中心：Agent 的长期记忆"
+          description="Brand KB、Product KB、Industry KB、Live KB、Best Practice KB、Prompt KB、Component KB、Performance KB 均按 RAG 思路沉淀。"
+          action={<button>上传资料</button>}
+        />
         <KnowledgeCenter initialDocuments={documents} initialChunks={chunks} />
       </div>
     </WorkbenchShell>

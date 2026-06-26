@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from agent_runtime.llm import AssistantMessage, OpenAICompatibleLLM
+from agent_runtime.llm import AssistantMessage, ModelGateway
 from apps.api.app.application.compliance_service import ComplianceService
 from apps.api.app.application.speech_service import SpeechService
 from apps.api.app.application.tasks.queue import FileTaskQueue
@@ -19,7 +19,12 @@ class LiveRoomService:
         self.workspace_root = Path(workspace_root).resolve()
         self.repository = repository or FileLiveRoomRepository(self.workspace_root)
         self.task_queue = task_queue or FileTaskQueue(self.workspace_root)
-        self.llm = llm or OpenAICompatibleLLM()
+        self.llm = llm
+        if self.llm is None:
+            try:
+                self.llm = ModelGateway(workspace_root=str(self.workspace_root))
+            except RuntimeError:
+                self.llm = None
         self.compliance = ComplianceService()
         self.speech = SpeechService(self.repository)
 

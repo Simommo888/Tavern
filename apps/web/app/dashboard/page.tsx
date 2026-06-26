@@ -1,51 +1,85 @@
+import Link from 'next/link';
 import WorkbenchShell from '@/components/live/WorkbenchShell';
-import { getDashboardSummary } from '@/lib/api/workbench';
-
-const modules = [
-  ['商品中心', '管理 SKU、售价、香型、度数、容量、卖点、适用场景和 FAQ。'],
-  ['直播间管理', '创建直播间、绑定数字人、绑定商品池、控制直播状态。'],
-  ['数字人管理', '维护真人素材、HeyGen Avatar、声音配置和生成任务。'],
-  ['话术中心', '维护开场、讲品、促单、互动、感谢话术，并支持 AI 生成。'],
-  ['数据中心', '观察 GMV、成交单量、在线人数、互动率和转化率。'],
-  ['合规审计', '沉淀酒类合规规则、风险命中记录和模型输出审计。'],
-];
+import MetricGrid from '@/components/ui/MetricGrid';
+import PageHero from '@/components/ui/PageHero';
+import ProgressBar from '@/components/ui/ProgressBar';
+import StatusBadge from '@/components/ui/StatusBadge';
+import { getDashboardSummary, listAgents, listProjects, listWorkflowRuns } from '@/lib/api/workbench';
 
 export default async function DashboardPage() {
-  const summary = await getDashboardSummary();
-  const metrics = [
-    ['在线人数', summary.online_users.toLocaleString('zh-CN')],
-    ['当前 GMV', `¥${summary.current_gmv.toLocaleString('zh-CN')}`],
-    ['今日成交额', `¥${summary.today_revenue.toLocaleString('zh-CN')}`],
-    ['当前商品', summary.current_product?.product_name ?? '未配置'],
-    ['数字人状态', summary.avatar_status],
-    ['直播状态', summary.live_status],
-  ];
+  const [summary, agents, projects, workflowRuns] = await Promise.all([
+    getDashboardSummary(),
+    listAgents(),
+    listProjects(),
+    listWorkflowRuns(),
+  ]);
+  const latestRun = workflowRuns[0];
   return (
     <WorkbenchShell>
       <div className="page">
-        <header className="hero">
-          <div>
-            <p className="eyebrow">AI Live Commerce Workbench</p>
-            <h1>AI 数字人直播工作台</h1>
-            <p>第一阶段聚焦酒类无人直播：自动讲品、回复弹幕、讲故事、促单、感谢下单和控制直播节奏。</p>
-          </div>
-          <a href="/live-rooms/demo"><button>进入直播总控</button></a>
-        </header>
+        <PageHero
+          eyebrow="AI Company Control Center"
+          title="你的 AI 直播公司正在工作"
+          description="CEO、品牌、商品、脚本、导演、声音、数字人、场景、视频与数据 Agent 共同完成直播生产流水线。首页优先展示 AI 员工状态，而不是传统后台指标。"
+          action={<Link href="/projects"><button>创建 / 进入项目</button></Link>}
+        />
 
-        <section className="metrics">
-          {metrics.map(([label, value]) => (
-            <article key={label} className="card metric">
-              <span>{label}</span>
-              <strong>{value}</strong>
+        <MetricGrid metrics={[
+          { label: '活跃 Project', value: summary.project_count, hint: '所有内容归属项目' },
+          { label: '工作中 Agent', value: summary.active_agent_count, hint: 'AI 公司当前产能' },
+          { label: '可复用组件', value: summary.component_count, hint: '公司资产沉淀' },
+          { label: 'Workflow Runs', value: summary.workflow_run_count, hint: '生产流程记录' },
+        ]} />
+
+        <section className="grid three">
+          {agents.map((agent) => (
+            <article key={agent.agent_id} className="card agent-card">
+              <header>
+                <div className="card-row">
+                  <div className="agent-avatar">{agent.name.slice(0, 1)}</div>
+                  <div>
+                    <h2>{agent.name}</h2>
+                    <small>{agent.department} · {agent.role}</small>
+                  </div>
+                </div>
+                <StatusBadge status={agent.status} />
+              </header>
+              <p>{agent.current_task || '等待 CEO Agent 分配任务'}</p>
+              <ProgressBar value={agent.progress} />
+              <dl>
+                <div><dt>Token</dt><dd>{agent.token_count.toLocaleString('zh-CN')}</dd></div>
+                <div><dt>耗时</dt><dd>{agent.elapsed_seconds}s</dd></div>
+              </dl>
+              <div className="timeline">
+                {agent.logs.slice(-2).map((log) => <small key={log}>• {log}</small>)}
+              </div>
             </article>
           ))}
         </section>
 
         <section className="grid">
-          {modules.map(([title, description]) => (
-            <article key={title} className="card">
-              <h2>{title}</h2>
-              <p>{description}</p>
+          <article className="card wide">
+            <div className="card-row">
+              <div>
+                <h2>当前生产流程</h2>
+                <p>{latestRun ? `正在执行节点：${latestRun.current_node_id || '等待调度'}` : '暂无运行中的工作流'}</p>
+              </div>
+              {latestRun && <StatusBadge status={latestRun.status} />}
+            </div>
+            {latestRun && <ProgressBar value={latestRun.progress} />}
+            <div className="timeline">
+              {(latestRun?.logs ?? ['等待上传品牌与商品资料']).map((log) => <article key={log} className="reply"><span>Workflow Log</span><p>{log}</p></article>)}
+            </div>
+          </article>
+
+          {projects.map((project) => (
+            <article key={project.project_id} className="card">
+              <div className="card-row">
+                <h2>{project.name}</h2>
+                <StatusBadge status={project.status} />
+              </div>
+              <p>{project.objective}</p>
+              <div className="tag-list">{project.tags.map((tag) => <span key={tag} className="tag">{tag}</span>)}</div>
             </article>
           ))}
         </section>

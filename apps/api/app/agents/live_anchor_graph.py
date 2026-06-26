@@ -1,12 +1,18 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from apps.api.app.agents.state import LiveAnchorState
+from apps.api.app.application.workbench_service import WorkbenchService
 from apps.api.app.domain.compliance.policies import check_alcohol_compliance
 from apps.api.app.domain.live.entities import ProductProfile
 from apps.api.app.domain.live.services import classify_intent, fallback_reply
 
 
 class LiveAnchorGraph:
+    def __init__(self, workbench: WorkbenchService | None = None, workspace_root: str | Path = ".") -> None:
+        self.workbench = workbench or WorkbenchService(workspace_root)
+
     def run(self, state: LiveAnchorState) -> LiveAnchorState:
         state = self.normalize_audience_event(state)
         state = self.classify_comment_intent(state)
@@ -29,7 +35,19 @@ class LiveAnchorGraph:
         return state
 
     def retrieve_product_knowledge(self, state: LiveAnchorState) -> LiveAnchorState:
-        state.setdefault("retrieved_chunks", [])
+        product_id = str(state.get("product_context", {}).get("product_id") or "")
+        results = self.workbench.search_knowledge_with_scores(state.get("event_text", ""), product_id=product_id, limit=5)
+        state["retrieved_chunks"] = [
+            {
+                "chunk_id": item["chunk"].chunk_id,
+                "document_id": item["chunk"].document_id,
+                "product_id": item["chunk"].product_id,
+                "text": item["chunk"].text,
+                "score": item["score"],
+                "matched_terms": item["matched_terms"],
+            }
+            for item in results
+        ]
         return state
 
     def pre_compliance_check(self, state: LiveAnchorState) -> LiveAnchorState:
@@ -46,7 +64,10 @@ class LiveAnchorGraph:
         return state
 
     def generate_anchor_reply(self, state: LiveAnchorState) -> LiveAnchorState:
-        product = ProductProfile.model_validate(state.get("product_context") or {})
+        product_context = dict(state.get("product_context") or {})
+        if "price" in product_context:
+            product_context["price"] = str(product_context["price"])
+        product = ProductProfile.model_validate(product_context)
         state["final_reply"] = fallback_reply(product, state.get("event_text", ""), state.get("intent", "smalltalk"))
         return state
 

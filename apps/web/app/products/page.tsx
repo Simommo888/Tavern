@@ -1,5 +1,6 @@
 import WorkbenchShell from '@/components/live/WorkbenchShell';
 import ProductCenter from '@/components/live/ProductCenter';
+import PageHero from '@/components/ui/PageHero';
 import { listProducts } from '@/lib/api/workbench';
 
 export default async function ProductsPage() {
@@ -7,14 +8,12 @@ export default async function ProductsPage() {
   return (
     <WorkbenchShell>
       <div className="page">
-        <header className="hero">
-          <div>
-            <p className="eyebrow">Product Center</p>
-            <h1>商品中心</h1>
-            <p>管理酒类商品的 SKU、价格、香型、度数、容量、卖点、适用场景和 FAQ。</p>
-          </div>
-          <button>新增商品</button>
-        </header>
+        <PageHero
+          eyebrow="Project / Product Intelligence"
+          title="商品资料是 Agent 的输入资产"
+          description="管理 SKU、价格、香型、度数、容量、卖点、场景和 FAQ，供 Product Analyst Agent 与 Script Agent 复用。"
+          action={<button>新增商品</button>}
+        />
         <ProductCenter initialProducts={products} />
       </div>
     </WorkbenchShell>

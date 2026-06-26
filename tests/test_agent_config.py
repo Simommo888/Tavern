@@ -86,6 +86,11 @@ class AgentConfigTests(unittest.TestCase):
                 self.assertEqual(reranker_base_url(tmp), "https://env-reranker.test")
                 self.assertEqual(reranker_api_key(tmp), "env-reranker-key")
 
+    def test_tavern_llm_environment_overrides_legacy_vimax_environment(self):
+        with patch.dict(os.environ, {"TAVERN_LLM_MODEL": "tavern-model", "VIMAX_LLM_MODEL": "vimax-model", "TAVERN_LLM_API_KEY": "tavern-key", "VIMAX_LLM_API_KEY": "vimax-key"}, clear=True):
+            self.assertEqual(llm_model(), "tavern-model")
+            self.assertEqual(llm_api_key(), "tavern-key")
+
     def test_image_and_video_keys_fall_back_to_llm_key(self):
         with tempfile.TemporaryDirectory() as tmp:
             config_dir = Path(tmp) / "configs"

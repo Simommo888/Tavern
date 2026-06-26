@@ -1,59 +1,57 @@
-ViMax workflow DAG:
+# Tavern Phase 5 Workflow
+
+Tavern Phase 5 focuses on the canonical live-commerce workflow.
+
+## Canonical DAG
 
 ```text
-input_idea
-  -> project_brief
-  -> characters
+product
+  -> brand
+  -> story
   -> script
   -> storyboard
-  -> shot_decomposition
-  -> camera_tree
-  -> frame_prompts
-  -> keyframes
-  -> video_clips
-  -> final_video
+  -> voice
+  -> avatar
+  -> live_room
+  -> video
+  -> streaming
 ```
 
-`.working_dir/<session_id-or-run_id>/` is the artifact authority. `.vimax/sessions.json` is only a session index. `.vimax/memory.md` stores user preferences only.
+## Operating rules
 
-Idea mode writes scene-level planning artifacts under `idea2video/scene_<idx>/`. Script mode writes single-script planning artifacts under `script2video/`. Use `vimax_narrative_planning` to create or revise structured text artifacts. Use `vimax_render_video` only when narrative planning dependencies exist.
+- Treat every stage as a reusable artifact-producing node.
+- Prefer deleting duplicate stage logic over adding new variants.
+- Keep the workflow API, seed data, and UI visualization in sync with the canonical DAG above.
+- When a run is mid-pipeline, resume from the current node instead of recreating earlier stages.
+- Event-trigger rules are separate from the main DAG; they start workflow runs but do not replace the pipeline.
+- The final node is `streaming`; a run is complete only after it succeeds.
 
-When the user asks to continue an existing project or fill missing text planning nodes, call `vimax_narrative_planning` for the active session. You may omit `idea` and `script`; the tool will reuse the active session source and existing cached artifacts. Do not use fake `revision_target` values such as `missing_structured_text_artifacts`; revision targets must be real relative file paths.
+## Stage contract
 
-After project_brief, characters, script, storyboard, shot_decomposition, and camera_tree exist, if the user did not ask for end-to-end generation or render, do not call another tool. Reply that text planning is complete and ask whether to revise or enter render.
+Each workflow node should surface:
 
-If the user explicitly asks for end-to-end generation, continue from planning into render tools.
+- stage name
+- agent or owner
+- current status
+- latest log or output summary
+- token count and duration
+- downstream handoff
 
+## Visual requirements
 
-Alcohol live-commerce production DAG:
+- `/workflow` must render the full DAG as a connected lane.
+- Completed stages should remain visible for audit and reuse.
+- The current stage must be obvious at a glance.
+- The board should support later reuse for branching workflows.
 
-```text
-user_idea
-  -> alcohol_story_generation
-  -> alcohol_script_generation
-  -> alcohol_storyboard_generation
-  -> heygen_live_room_generation
-  -> veo_transition_closeup_generation
-  -> ffmpeg_video_composition
-  -> production_run_status
-  -> user_review
-  -> production_performance_ingest
-  -> reusable_patterns
-```
+## Output expectations
 
-For alcohol sales video work, the main agent is a supervisor. It delegates work to business-level production tools and reviews their material ids and ledger state. The supervisor does not directly modify artifacts, run ffmpeg, call HeyGen, or call Veo. Every final video must have `production/run.json`, `production/materials.jsonl`, `production/composition_manifest.json`, and a final video material with traceable input material ids. Use `production_reusable_patterns_search` before creating a new run when the user asks to reuse past winning material or sales patterns.
+When discussing or generating workflow output, describe:
 
+1. which stage is running,
+2. what artifact it produces,
+3. what the next handoff is,
+4. whether the stage can be reused or skipped.
 
-Novel workflow DAG:
-
-```text
-novel_text
-  -> compressed_novel
-  -> events
-  -> relevant_chunks
-  -> scenes
-  -> global_characters
-  -> scene_scripts
-```
-
-Use `vimax_novel_planning` when the user provides long prose, a novel excerpt, or explicitly asks for novel-to-video planning. `vimax_novel_planning` only creates structured text artifacts under `novel2video/`; it does not generate portraits, scene videos, or final video. After novel structured text artifacts exist, do not render unless the user explicitly asks for scene render or end-to-end generation.
+Use live-commerce terminology only.
+Do not fall back to legacy ViMax planning language.

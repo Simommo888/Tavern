@@ -1,0 +1,30 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Node
+apps/web/node_modules/
+apps/web/.next/
+apps/web/*.tsbuildinfo
+node_modules/
+
+# Local runtime state
+.working_dir/
+.vimax/
+.test/
+configs/*.local.yaml
+configs/*.local.json
+configs/agent.secrets.local.yaml
+
+# Git and editor state
+.git/
+.github/
+.vscode/
+.idea/
+
+# Logs and OS files
+*.log
+.DS_Store
+Thumbs.db
