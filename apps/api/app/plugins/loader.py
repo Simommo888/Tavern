@@ -8,7 +8,7 @@ from apps.api.app.plugins.avatar import LiveTalkingAvatarProvider, MuseTalkAvata
 from apps.api.app.plugins.base import LiveOSPlugin, NotInstalledPlugin
 from apps.api.app.plugins.model.openai_compatible import OpenAICompatibleModelProvider
 from apps.api.app.plugins.rag import LocalKeywordRagProvider
-from apps.api.app.plugins.tts import EdgeTtsProvider, FishSpeechProvider, OpenAICompatibleTtsProvider
+from apps.api.app.plugins.tts import CosyVoiceHttpTtsProvider, EdgeTtsProvider, FishSpeechProvider, OpenAICompatibleTtsProvider
 from apps.api.app.plugins.video.ffmpeg_moviepy import FfmpegMoviePyProvider
 
 
@@ -21,6 +21,7 @@ class PluginLoader:
     def load(self) -> list[LiveOSPlugin]:
         plugins: list[LiveOSPlugin] = [
             OpenAICompatibleModelProvider(),
+            CosyVoiceHttpTtsProvider(self.workspace_root),
             OpenAICompatibleTtsProvider(),
             EdgeTtsProvider(),
             FfmpegMoviePyProvider(),
@@ -46,6 +47,8 @@ class PluginLoader:
         category = _category_from_adapter(str(item.get("adapter") or ""))
         capabilities = _capabilities_for(provider_id, category)
         display_name = _display_name_for(provider_id, str(item.get("name") or provider_id))
+        if provider_id == "cosyvoice_tts":
+            return CosyVoiceHttpTtsProvider(self.workspace_root, repo_url=str(item.get("repo_url") or ""), commit=str(item.get("commit") or ""), license=str(item.get("license") or ""), adapter=str(item.get("adapter") or ""))
         if provider_id == "fish_speech":
             return FishSpeechProvider(repo_url=str(item.get("repo_url") or ""), commit=str(item.get("commit") or ""), license=str(item.get("license") or ""), adapter=str(item.get("adapter") or ""))
         if provider_id == "livetalking":
@@ -77,6 +80,8 @@ def _dedupe_by_provider_id(plugins: list[LiveOSPlugin]) -> list[LiveOSPlugin]:
 def _provider_id(name: str) -> str:
     normalized = name.strip().lower().replace("-", "_").replace(" ", "_")
     aliases = {
+        "cosyvoice": "cosyvoice_tts",
+        "cosyvoice_tts": "cosyvoice_tts",
         "fish_speech": "fish_speech",
         "livetalking": "livetalking",
         "live_talking": "livetalking",
@@ -102,6 +107,7 @@ def _category_from_adapter(adapter: str) -> str:
 
 def _capabilities_for(provider_id: str, category: str) -> tuple[str, ...]:
     mapping = {
+        "cosyvoice_tts": ("tts", "voice_clone", "external_http"),
         "fish_speech": ("tts", "voice_clone"),
         "livetalking": ("realtime_avatar", "audio_drive"),
         "musetalk": ("audio_drive", "lip_sync"),
@@ -112,6 +118,7 @@ def _capabilities_for(provider_id: str, category: str) -> tuple[str, ...]:
 
 def _display_name_for(provider_id: str, fallback: str) -> str:
     mapping = {
+        "cosyvoice_tts": "CosyVoice HTTP TTS",
         "fish_speech": "Fish Speech Adapter",
         "livetalking": "LiveTalking Adapter",
         "musetalk": "MuseTalk Adapter",

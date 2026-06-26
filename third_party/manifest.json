@@ -1,5 +1,14 @@
 [
   {
+    "name": "CosyVoice",
+    "repo_url": "https://github.com/FunAudioLLM/CosyVoice",
+    "commit": "",
+    "license": "check_before_commercial_use",
+    "purpose": "External HTTP TTS and voice cloning provider for Voice Agent",
+    "adapter": "apps/api/app/plugins/tts",
+    "status": "external_http_service_not_vendored"
+  },
+  {
     "name": "fish-speech",
     "repo_url": "https://github.com/fishaudio/fish-speech",
     "commit": "",

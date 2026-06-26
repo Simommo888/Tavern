@@ -1,6 +1,8 @@
+import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import Mock, patch
 
 from fastapi.testclient import TestClient
 
@@ -148,6 +150,8 @@ class WorkbenchApiTests(unittest.TestCase):
             self.assertEqual(plan["brand_analysis"]["brand_name"], "龙八")
             self.assertTrue(plan["script_snapshot"]["content"].startswith("大家好"))
             self.assertEqual(plan["saved_outputs"]["live_room_composition_id"], plan["live_room_composition_id"])
+            self.assertIn(plan["steps"][3]["data"]["provider_id"], {"edge_tts", "placeholder"})
+            self.assertIn("tts_job", plan["saved_outputs"])
 
             listed = client.get("/api/v1/mvp/live-plans")
             self.assertEqual(listed.status_code, 200)
@@ -160,6 +164,25 @@ class WorkbenchApiTests(unittest.TestCase):
             nodes = client.get(f"/api/v1/workflow/runs/{plan['workflow_run_id']}/nodes")
             self.assertEqual(nodes.status_code, 200)
             self.assertEqual([node["status"] for node in nodes.json()["nodes"]], ["succeeded"] * 7)
+
+    def test_phase_nine_mvp_uses_cosyvoice_when_configured(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            workbench_module._service = WorkbenchService(Path(tmp))
+            client = TestClient(create_app())
+            response = Mock()
+            response.status_code = 200
+            response.headers = {"content-type": "audio/wav"}
+            response.content = b"RIFF....WAVEfmt "
+            with patch.dict(os.environ, {"TAVERN_COSYVOICE_BASE_URL": "http://cosyvoice.test", "TAVERN_COSYVOICE_SPEECH_PATH": "/v1/audio/speech"}, clear=False):
+                with patch("apps.api.app.plugins.tts.requests.get", return_value=response):
+                    with patch("apps.api.app.plugins.tts.requests.post", return_value=response):
+                        result = client.post("/api/v1/mvp/live-plans/run", json={"brand_name": "CosyVoice验证"})
+
+            self.assertEqual(result.status_code, 200)
+            plan = result.json()["plan"]
+            self.assertEqual(plan["steps"][3]["data"]["provider_id"], "cosyvoice_tts")
+            self.assertTrue(plan["speech_artifact_uri"].startswith("file://"))
+            self.assertEqual(plan["saved_outputs"]["tts_job"]["metadata"]["provider_id"], "cosyvoice_tts")
 
     def test_rag_model_avatar_and_platform_apis(self):
         with tempfile.TemporaryDirectory() as tmp:

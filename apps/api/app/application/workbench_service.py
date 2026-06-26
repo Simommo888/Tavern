@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import os
 import re
 from typing import Any
 
@@ -240,11 +241,12 @@ class WorkbenchService:
         composition = self._ensure_mvp_live_room(project, product, brand_analysis)
         plan = MvpLivePlan(project_id=project.project_id, product_id=product.product_id)
 
-        tts_job = self.submit_plugin_job("edge_tts", {
+        tts_job = self._submit_mvp_tts_job({
             "text": script.content,
             "voice": avatar.voice_name or "zh-CN-XiaoxiaoNeural",
             "product_id": product.product_id,
             "plan_id": plan.plan_id,
+            "tts_provider": payload.get("tts_provider"),
         })
         speech_uri = tts_job.get("output_uri") or f"minio://mvp-plans/{plan.plan_id}/speech/{tts_job.get('job_id', 'tts')}.wav"
         avatar_job = self.create_avatar_job({
@@ -289,7 +291,7 @@ class WorkbenchService:
             duration_seconds=96,
             updated_at=utc_now_iso(),
         ))
-        steps = _mvp_steps(product, brand_analysis, script, avatar, avatar_job, composition, speech_uri, live_video_uri, plan.plan_id)
+        steps = _mvp_steps(product, brand_analysis, script, avatar, avatar_job, composition, speech_uri, live_video_uri, plan.plan_id, tts_job)
         self._write_mvp_node_runs(workflow_run, workflow_def, steps, script.template_id)
         saved_outputs = {
             "project_id": project.project_id,
@@ -603,6 +605,36 @@ class WorkbenchService:
 
     def cancel_plugin_job(self, provider_id: str, job_id: str) -> dict[str, Any]:
         return self.plugin_manager.cancel_job(provider_id, job_id).__dict__
+
+    def _submit_mvp_tts_job(self, payload: dict[str, Any]) -> dict[str, Any]:
+        providers = _mvp_tts_provider_candidates(str(payload.get("tts_provider") or ""))
+        errors: list[dict[str, str]] = []
+        for provider_id in providers:
+            if provider_id == "placeholder":
+                continue
+            try:
+                health = self.plugin_manager.health(provider_id)
+                if health.get("status") in {"not_configured", "unhealthy", "not_installed"}:
+                    errors.append({"provider_id": provider_id, "error": str(health.get("error") or health.get("status"))})
+                    continue
+                job = self.submit_plugin_job(provider_id, payload)
+            except Exception as exc:
+                errors.append({"provider_id": provider_id, "error": str(exc)[:240]})
+                continue
+            metadata = {**dict(job.get("metadata") or {}), "provider_id": provider_id}
+            if errors:
+                metadata["fallback_errors"] = errors
+            job = {**job, "metadata": metadata}
+            if job.get("status") != "failed":
+                return job
+            errors.append({"provider_id": provider_id, "error": str(job.get("error") or "failed")[:240]})
+        return {
+            "job_id": "tts-placeholder",
+            "status": "placeholder",
+            "output_uri": "",
+            "error": "",
+            "metadata": {"provider_id": "placeholder", "fallback_errors": errors},
+        }
 
     def _sync_asset_component_links(self, component: LiveComponent) -> None:
         if not component.source_asset_ids:
@@ -1051,6 +1083,47 @@ def _component_code(component_type: str, number: int) -> str:
     return f"{prefix}_{number:03d}"
 
 
+def _mvp_tts_provider_candidates(explicit_provider: str = "") -> list[str]:
+    if explicit_provider and _normalize_tts_provider(explicit_provider) == "placeholder":
+        return ["placeholder"]
+    mvp_provider = os.environ.get("TAVERN_MVP_TTS_PROVIDER", "cosyvoice_tts")
+    if not explicit_provider and _normalize_tts_provider(mvp_provider) == "placeholder":
+        return ["placeholder"]
+    configured = [
+        explicit_provider,
+        mvp_provider,
+        os.environ.get("TAVERN_TTS_PROVIDER", ""),
+        os.environ.get("TAVERN_TTS_FALLBACK_PROVIDER", "edge_tts"),
+        "edge_tts",
+        "placeholder",
+    ]
+    candidates: list[str] = []
+    for provider in configured:
+        normalized = _normalize_tts_provider(provider)
+        if normalized and normalized not in candidates:
+            candidates.append(normalized)
+    return candidates or ["placeholder"]
+
+
+def _normalize_tts_provider(provider: str | None) -> str:
+    normalized = str(provider or "").strip().lower().replace("-", "_")
+    aliases = {
+        "cosyvoice": "cosyvoice_tts",
+        "cosyvoice_tts": "cosyvoice_tts",
+        "edge": "edge_tts",
+        "edge_tts": "edge_tts",
+        "openai": "openai_compatible_tts",
+        "openai_tts": "openai_compatible_tts",
+        "openai_compatible": "openai_compatible_tts",
+        "openai_compatible_tts": "openai_compatible_tts",
+        "placeholder": "placeholder",
+        "silent": "placeholder",
+        "off": "placeholder",
+        "none": "placeholder",
+    }
+    return aliases.get(normalized, normalized)
+
+
 def _mvp_brand_analysis(product: ProductRecord, payload: dict[str, Any]) -> dict[str, Any]:
     brand_name = str(payload.get("brand_name") or payload.get("brand") or product.product_name.split("礼盒")[0] or "直播品牌")
     selling_points = product.selling_points or ["直播间权益", "成熟消费者场景", "礼盒包装"]
@@ -1080,12 +1153,15 @@ def _mvp_script_content(product: ProductRecord, brand_analysis: dict[str, Any], 
     )
 
 
-def _mvp_steps(product: ProductRecord, brand_analysis: dict[str, Any], script: ScriptTemplate, avatar: AvatarProfile, avatar_job: AvatarJob, composition: LiveRoomComposition, speech_uri: str, live_video_uri: str, plan_id: str) -> list[dict[str, Any]]:
+def _mvp_steps(product: ProductRecord, brand_analysis: dict[str, Any], script: ScriptTemplate, avatar: AvatarProfile, avatar_job: AvatarJob, composition: LiveRoomComposition, speech_uri: str, live_video_uri: str, plan_id: str, tts_job: dict[str, Any]) -> list[dict[str, Any]]:
+    tts_metadata = dict(tts_job.get("metadata") or {})
+    tts_provider = str(tts_metadata.get("provider_id") or "placeholder")
+    speech_summary = "CosyVoice TTS 已生成口播音频" if tts_provider == "cosyvoice_tts" and tts_job.get("output_uri") else "TTS 已回退到备用 provider 或占位 URI"
     return [
         {"id": "upload_product", "label": "上传商品", "status": "succeeded", "summary": f"商品 {product.product_name} 已发布并结构化", "artifact_uri": f"workbench://products/{product.product_id}", "data": {"product_id": product.product_id, "sku": product.sku}, "duration_seconds": 8},
         {"id": "brand_analysis", "label": "品牌分析", "status": "succeeded", "summary": f"{brand_analysis.get('brand_name')} 品牌分析已生成", "artifact_uri": f"workbench://mvp-plans/{plan_id}/brand-analysis", "data": brand_analysis, "token_count": 900, "duration_seconds": 18},
         {"id": "script", "label": "剧本", "status": "succeeded", "summary": "数字人口播剧本已生成并保存为 Script Template", "artifact_uri": f"workbench://scripts/{script.template_id}", "data": {"script_template_id": script.template_id, "characters": len(script.content)}, "token_count": 1200, "duration_seconds": 22},
-        {"id": "speech", "label": "数字人口播", "status": "succeeded", "summary": "TTS Plugin 已生成口播音频占位产物", "artifact_uri": speech_uri, "data": {"provider_id": "edge_tts", "speech_artifact_uri": speech_uri}, "duration_seconds": 12},
+        {"id": "speech", "label": "数字人口播", "status": "succeeded", "summary": speech_summary, "artifact_uri": speech_uri, "data": {"provider_id": tts_provider, "tts_job_id": tts_job.get("job_id", ""), "speech_artifact_uri": speech_uri, "fallback_errors": tts_metadata.get("fallback_errors", [])}, "duration_seconds": 12},
         {"id": "avatar", "label": "数字人", "status": "succeeded", "summary": f"数字人 {avatar.name} 文本驱动任务已完成", "artifact_uri": avatar_job.output_url, "data": {"avatar_id": avatar.avatar_id, "avatar_job_id": avatar_job.job_id}, "duration_seconds": 16},
         {"id": "live_video", "label": "直播视频", "status": "succeeded", "summary": "FFmpeg/MoviePy Wrapper 已生成直播视频占位产物", "artifact_uri": live_video_uri, "data": {"live_video_uri": live_video_uri, "composition_id": composition.composition_id}, "duration_seconds": 16},
         {"id": "saved_plan", "label": "保存方案", "status": "succeeded", "summary": "MVP直播方案已保存，可复用到项目与数据中心", "artifact_uri": f"workbench://mvp-plans/{plan_id}", "data": {"plan_id": plan_id}, "duration_seconds": 4},

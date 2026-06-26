@@ -66,6 +66,7 @@ Plugin Implementation
 | 类别 | Provider | 状态 | 说明 |
 | --- | --- | --- | --- |
 | Model | OpenAI Compatible Model Gateway | ready/由 gateway 配置 | 封装 `agent_runtime.llm.ModelGateway` |
+| TTS | CosyVoice HTTP TTS | 配置后 ready | 外部 HTTP 服务，不将模型仓库和权重并入业务代码 |
 | TTS | Edge TTS | ready | 本地/免费备用方案 |
 | TTS | OpenAI Compatible TTS | 配置后 ready | 兼容 `/audio/speech` |
 | TTS | Fish Speech | candidate_not_installed | 在 `third_party/manifest.json` 中跟踪 |
@@ -86,6 +87,16 @@ Plugin Implementation
 - `TAVERN_STORAGE_BACKEND=file|postgres`
 - `TAVERN_CORS_ORIGINS`
 - `TAVERN_TTS_PROVIDER=edge|openai|sapi|placeholder`
+- `TAVERN_MVP_TTS_PROVIDER=cosyvoice_tts|edge_tts|openai_compatible_tts|placeholder`
+- `TAVERN_TTS_FALLBACK_PROVIDER=edge_tts|openai_compatible_tts|placeholder`
+- `TAVERN_COSYVOICE_BASE_URL`
+- `TAVERN_COSYVOICE_HEALTH_PATH`
+- `TAVERN_COSYVOICE_SPEECH_PATH`
+- `TAVERN_COSYVOICE_MODEL`
+- `TAVERN_COSYVOICE_VOICE`
+- `TAVERN_COSYVOICE_FORMAT`
+- `TAVERN_COSYVOICE_TIMEOUT_SECONDS`
+- `TAVERN_TTS_OUTPUT_DIR`
 - `DATABASE_URL`
 - `REDIS_URL`
 - `RABBITMQ_URL`
