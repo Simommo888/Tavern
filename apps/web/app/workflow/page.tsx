@@ -5,7 +5,7 @@ import StatusBadge from '@/components/ui/StatusBadge';
 import WorkflowCenter from '@/components/live/WorkflowCenter';
 import { listWorkflowDefinitions, listWorkflowNodeRuns, listWorkflowRules, listWorkflowRuns } from '@/lib/api/workbench';
 
-const canonicalStages = ['商品', '品牌', '故事', '剧本', '分镜', '语音', '数字人', '直播间', '视频', '推流'];
+const canonicalStages = ['商品', '品牌', '故事', '剧本', '分镜', '导演', '视觉导演', '语音', '数字人', '直播间', '视频', '推流'];
 
 export default async function WorkflowPage() {
   const [rules, definitions, runs] = await Promise.all([
@@ -25,7 +25,7 @@ export default async function WorkflowPage() {
         <PageHero
           eyebrow="Visual Workflow"
           title="商品到推流的 AI 直播生产工作流"
-          description="Phase 5 将 Workflow 固化为商品→品牌→故事→剧本→分镜→语音→数字人→直播间→视频→推流。每个节点都产出可审计、可复用、可重跑的生产资产。"
+          description="Phase 5 将 Workflow 固化为商品→品牌→故事→剧本→分镜→导演→视觉导演→语音→数字人→直播间→视频→推流。每个节点都产出可审计、可复用、可重跑的生产资产。"
           action={<button>重跑当前节点</button>}
         />
 

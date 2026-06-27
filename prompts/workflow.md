@@ -10,6 +10,8 @@ product
   -> story
   -> script
   -> storyboard
+  -> director
+  -> visual_director
   -> voice
   -> avatar
   -> live_room

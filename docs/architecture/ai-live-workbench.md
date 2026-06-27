@@ -122,6 +122,16 @@ flowchart LR
 
 ## 4. Agent 流程图
 
+### 4.1 主生产链路
+
+```text
+商品 → 品牌 → 故事 → 剧本 → 分镜 → 导演 → 视觉导演 → 语音 → 数字人 → 直播间 → 视频 → 推流
+```
+
+该链路是 Agent Company、Workflow API 与 `/workflow` 控制台的统一展示顺序。Compliance Agent 是脚本后、视觉导演后和推流前的合规 gate，不插入主链路 lane。
+
+### 4.2 直播弹幕回复链路
+
 ```mermaid
 flowchart TD
   Start([Audience Event]) --> Live[Live Agent: 状态与调度]

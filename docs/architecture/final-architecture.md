@@ -27,7 +27,15 @@ legacy/                归档的 ViMax 时代 code/docs/assets
 
 ## 主产品流程
 
-Phase 9 MVP 是当前参考黄金路径：
+Phase 5 主生产工作流是 Agent Company、Workflow API 与 `/workflow` 控制台的统一主链路：
+
+```text
+商品 → 品牌 → 故事 → 剧本 → 分镜 → 导演 → 视觉导演 → 语音 → 数字人 → 直播间 → 视频 → 推流
+```
+
+Compliance Agent 作为酒类合规 gate，分别在脚本后、视觉导演后和推流前审查文案、视觉蓝图、素材映射、OBS 图层和发布方案；它不作为第 13 个主链路节点展示。
+
+Phase 9 MVP 是独立参考黄金路径：
 
 ```text
 上传商品
@@ -45,7 +53,7 @@ Phase 9 MVP 是当前参考黄金路径：
 保存直播方案
 ```
 
-后端将该流程持久化为 `MvpLivePlan`，并同时产生 `WorkflowRun` / `WorkflowNodeRun` 记录以便审计。
+后端将 MVP 流程持久化为 `MvpLivePlan`，并同时产生 `WorkflowRun` / `WorkflowNodeRun` 记录以便审计。
 
 ## 插件架构
 

@@ -14,7 +14,19 @@ docs/       # 架构与迁移文档
 tests/      # 回归测试
 ```
 
+## 主生产工作流
+
+Phase 5 的 Agent Company、Workflow API 与 `/workflow` 控制台统一使用以下主链路：
+
+```text
+商品 → 品牌 → 故事 → 剧本 → 分镜 → 导演 → 视觉导演 → 语音 → 数字人 → 直播间 → 视频 → 推流
+```
+
+Compliance Agent 作为酒类合规 gate 审查脚本、视觉蓝图和发布方案，不插入 12 步主链路。
+
 ## 黄金 MVP 流程
+
+Phase 9 MVP 保留为独立的可运行闭环：
 
 ```text
 上传商品

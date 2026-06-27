@@ -15,17 +15,19 @@ class AgentCompanyTests(unittest.TestCase):
         self.assertEqual(company.role_ids(), [
             "ceo",
             "planner",
-            "brand",
             "product",
+            "brand",
             "story",
             "script",
             "storyboard",
             "director",
+            "visual_director",
             "voice",
             "avatar",
             "scene",
             "composer",
             "streaming",
+            "compliance",
             "analytics",
             "optimization",
         ])
@@ -48,6 +50,12 @@ class AgentCompanyTests(unittest.TestCase):
             "解析这个商品 SKU 的卖点和 FAQ": "product",
             "生成直播口播脚本和 CTA": "script",
             "把剧本拆成分镜镜头": "storyboard",
+            "输出导演执行稿和镜头调度": "director",
+            "把分镜转换成 Visual Blueprint 和 OBS 图层": "visual_director",
+            "单独看一下视觉感觉": "ceo",
+            "设计直播间场景组件布局": "scene",
+            "把视频用 FFmpeg 合成成片": "composer",
+            "检查酒类合规和未成年人风险": "compliance",
             "检查数字人主播 avatar 配置": "avatar",
             "复盘 GMV CTR CVR 数据": "analytics",
         }
@@ -80,16 +88,25 @@ class AgentCompanyTests(unittest.TestCase):
             self.assertIn("agent.company", [part.id for part in parts])
             message = builder.build_messages("请分析品牌背书")[0]["content"]
             self.assertIn("Agent Company registry is active", message)
-            self.assertIn("CEO -> Planner -> Brand", message)
+            self.assertIn("CEO -> Planner -> Product -> Brand -> Story", message)
+            self.assertIn("Auxiliary gates: Compliance", message)
             self.assertIn("suggested_role: Brand", message)
 
     def test_workbench_seeds_agent_profiles_from_company_registry(self):
         with tempfile.TemporaryDirectory() as tmp:
             service = WorkbenchService(Path(tmp))
             agents = service.agent_profiles.list()
-            self.assertEqual(len(agents), 15)
+            self.assertEqual(len(agents), 17)
             role_ids = [str(agent.metadata.get("role_id")) for agent in agents]
             self.assertEqual(role_ids, build_default_agent_company().role_ids())
+            visual_director = next(agent for agent in agents if agent.metadata.get("role_id") == "visual_director")
+            self.assertIn("visual_blueprint", visual_director.metadata.get("output_keys", []))
+            self.assertEqual(visual_director.metadata.get("system_prompt_version"), "visual-director-v1.0")
+            self.assertIn("system_prompt", visual_director.metadata)
+            compliance = next(agent for agent in agents if agent.metadata.get("role_id") == "compliance")
+            self.assertTrue(compliance.metadata.get("not_primary_workflow_node"))
+            self.assertIn("script", compliance.metadata.get("gate_after", []))
+            self.assertIn("streaming", compliance.metadata.get("gate_before", []))
             avatar = next(agent for agent in agents if agent.metadata.get("role_id") == "avatar")
             self.assertIn("heygen_live_room_check_config", avatar.tool_names)
             self.assertIn("mcp_capabilities", avatar.metadata)

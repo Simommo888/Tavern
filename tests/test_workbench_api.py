@@ -70,8 +70,9 @@ class WorkbenchApiTests(unittest.TestCase):
             definitions = client.get("/api/v1/workflow/definitions")
             self.assertEqual(definitions.status_code, 200)
             workflow = definitions.json()["definitions"][0]
-            self.assertEqual([node["label"] for node in workflow["nodes"]], ["商品", "品牌", "故事", "剧本", "分镜", "语音", "数字人", "直播间", "视频", "推流"])
+            self.assertEqual([node["label"] for node in workflow["nodes"]], ["商品", "品牌", "故事", "剧本", "分镜", "导演", "视觉导演", "语音", "数字人", "直播间", "视频", "推流"])
             self.assertEqual(workflow["nodes"][-1]["id"], "streaming")
+            self.assertIn("分镜→导演→视觉导演→语音", workflow["description"])
             self.assertEqual(workflow["edges"][-1], {"source": "video", "target": "streaming", "type": "handoff"})
 
             runs = client.get("/api/v1/workflow/runs")
@@ -79,7 +80,7 @@ class WorkbenchApiTests(unittest.TestCase):
             run = runs.json()["runs"][0]
             nodes = client.get(f"/api/v1/workflow/runs/{run['workflow_run_id']}/nodes")
             self.assertEqual(nodes.status_code, 200)
-            self.assertEqual([node["node_id"] for node in nodes.json()["nodes"]], ["product", "brand", "story", "script", "storyboard", "voice", "avatar", "live_room", "video", "streaming"])
+            self.assertEqual([node["node_id"] for node in nodes.json()["nodes"]], ["product", "brand", "story", "script", "storyboard", "director", "visual_director", "voice", "avatar", "live_room", "video", "streaming"])
 
             assets = client.get("/api/v1/assets")
             self.assertEqual(assets.status_code, 200)

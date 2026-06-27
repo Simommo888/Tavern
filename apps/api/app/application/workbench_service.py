@@ -674,6 +674,8 @@ class WorkbenchService:
             {"id": "story", "label": "故事", "agent": "Story Agent", "stage": "Story", "artifact": "brand_story", "description": "把品牌与商品转成直播间可讲述的故事线", "reusable": True},
             {"id": "script", "label": "剧本", "agent": "Script Agent", "stage": "Script", "artifact": "live_script", "description": "输出开场、讲品、促单、互动和收口口播", "reusable": True},
             {"id": "storyboard", "label": "分镜", "agent": "Storyboard Agent", "stage": "Storyboard", "artifact": "shot_plan", "description": "拆解镜头、字幕、视觉层和转场节奏", "reusable": True},
+            {"id": "director", "label": "导演", "agent": "Director Agent", "stage": "Director", "artifact": "director_script", "description": "协调镜头、节奏、表演与生产顺序，沉淀 Director Script 和导演执行意图", "reusable": True},
+            {"id": "visual_director", "label": "视觉导演", "agent": "Visual Director Agent", "stage": "Visual", "artifact": "visual_blueprint", "description": "将 Story、Script 和 Director Script 转换成品牌统一的 Visual Blueprint、Prompt、Asset Mapping 与 OBS 图层", "reusable": True},
             {"id": "voice", "label": "语音", "agent": "Voice Agent", "stage": "Voice", "artifact": "speech_audio", "description": "将口播剧本交给 TTS provider 生成语音素材", "reusable": False},
             {"id": "avatar", "label": "数字人", "agent": "Avatar Agent", "stage": "Avatar", "artifact": "avatar_clip", "description": "驱动数字人主播生成口播片段", "reusable": False},
             {"id": "live_room", "label": "直播间", "agent": "Scene Agent", "stage": "LiveRoom", "artifact": "live_room_composition", "description": "组合背景、商品卡、权益 POP 与数字人图层", "reusable": True},
@@ -684,7 +686,7 @@ class WorkbenchService:
         payload = {
             "name": "AI Live Commerce Product-to-Streaming Workflow",
             "version": "phase5-v1",
-            "description": "商品→品牌→故事→剧本→分镜→语音→数字人→直播间→视频→推流的企业级直播生产主链路。",
+            "description": "商品→品牌→故事→剧本→分镜→导演→视觉导演→语音→数字人→直播间→视频→推流的企业级直播生产主链路。",
             "nodes": nodes,
             "edges": edges,
             "status": "active",
@@ -767,39 +769,43 @@ class WorkbenchService:
             })
         else:
             project = self.projects.list()[0]
-        if not self.agent_profiles.list():
-            status_by_role = {"ceo": "working", "planner": "working", "brand": "working", "script": "working", "avatar": "blocked", "composer": "blocked"}
-            task_by_role = {
-                "ceo": "统筹本场直播生产流水线并确认验收标准",
-                "planner": "拆解 Phase 4 Agent Company 执行顺序",
-                "brand": "提炼品牌信任背书与内容调性",
-                "script": "优化直播口播与促单话术",
-                "avatar": "等待 Avatar/TTS provider 配置",
-                "composer": "等待数字人与转场素材进入合成",
-            }
-            progress_by_role = {"ceo": 0.82, "planner": 0.68, "brand": 0.76, "product": 1.0, "script": 0.64, "scene": 0.35, "avatar": 0.18, "composer": 0.18}
-            token_by_role = {"ceo": 2480, "planner": 1840, "brand": 1320, "product": 980, "script": 3560, "scene": 720, "avatar": 420, "composer": 420}
-            elapsed_by_role = {"ceo": 186, "planner": 126, "brand": 94, "product": 61, "script": 212, "scene": 40, "avatar": 37, "composer": 37}
-            logs_by_role = {
-                "ceo": ["已确认项目目标", "正在审核 Agent 输出"],
-                "planner": ["已拆解 Agent Company 角色链", "已建立 handoff 顺序"],
-                "brand": ["已读取品牌资料", "输出品牌关键词"],
-                "product": ["商品卖点解析完成"],
-                "script": ["已生成开场脚本", "正在生成促单脚本"],
-                "scene": ["已匹配酒类礼盒场景模板"],
-                "avatar": ["HeyGen provider 待配置", "数字人脚本接口已映射"],
-                "composer": ["FFmpeg provider 就绪", "Avatar provider 未配置"],
-            }
-            for role in build_default_agent_company().list_roles():
-                payload = role.profile_payload(
-                    status=status_by_role.get(role.role_id, "idle"),
-                    current_task=task_by_role.get(role.role_id, f"等待 {role.title} 任务输入"),
-                    progress=progress_by_role.get(role.role_id, 0.0),
-                    token_count=token_by_role.get(role.role_id, 0),
-                    elapsed_seconds=elapsed_by_role.get(role.role_id, 0),
-                    logs=logs_by_role.get(role.role_id, ["Agent Company 角色已注册"]),
-                )
-                self.agent_profiles.upsert(AgentProfile.model_validate(payload))
+        status_by_role = {"ceo": "working", "planner": "working", "brand": "working", "script": "working", "visual_director": "working", "avatar": "blocked", "composer": "blocked"}
+        task_by_role = {
+            "ceo": "统筹本场直播生产流水线并确认验收标准",
+            "planner": "拆解 Phase 4 Agent Company 执行顺序",
+            "brand": "提炼品牌信任背书与内容调性",
+            "script": "优化直播口播与促单话术",
+            "visual_director": "将分镜与导演稿转换成可执行 Visual Blueprint",
+            "avatar": "等待 Avatar/TTS provider 配置",
+            "composer": "等待数字人与转场素材进入合成",
+        }
+        progress_by_role = {"ceo": 0.82, "planner": 0.68, "brand": 0.76, "product": 1.0, "script": 0.64, "visual_director": 0.52, "scene": 0.35, "avatar": 0.18, "composer": 0.18}
+        token_by_role = {"ceo": 2480, "planner": 1840, "brand": 1320, "product": 980, "script": 3560, "visual_director": 1680, "scene": 720, "avatar": 420, "composer": 420}
+        elapsed_by_role = {"ceo": 186, "planner": 126, "brand": 94, "product": 61, "script": 212, "visual_director": 88, "scene": 40, "avatar": 37, "composer": 37}
+        logs_by_role = {
+            "ceo": ["已确认项目目标", "正在审核 Agent 输出"],
+            "planner": ["已拆解 Agent Company 角色链", "已建立 handoff 顺序"],
+            "brand": ["已读取品牌资料", "输出品牌关键词"],
+            "product": ["商品卖点解析完成"],
+            "script": ["已生成开场脚本", "正在生成促单脚本"],
+            "visual_director": ["已锁定品牌视觉原则", "正在生成 Visual Blueprint"],
+            "scene": ["已匹配酒类礼盒场景模板"],
+            "avatar": ["HeyGen provider 待配置", "数字人脚本接口已映射"],
+            "composer": ["FFmpeg provider 就绪", "Avatar provider 未配置"],
+        }
+        existing_role_ids = {str(agent.metadata.get("role_id") or "") for agent in self.agent_profiles.list()}
+        for role in build_default_agent_company().list_roles():
+            if role.role_id in existing_role_ids:
+                continue
+            payload = role.profile_payload(
+                status=status_by_role.get(role.role_id, "idle"),
+                current_task=task_by_role.get(role.role_id, f"等待 {role.title} 任务输入"),
+                progress=progress_by_role.get(role.role_id, 0.0),
+                token_count=token_by_role.get(role.role_id, 0),
+                elapsed_seconds=elapsed_by_role.get(role.role_id, 0),
+                logs=logs_by_role.get(role.role_id, ["Agent Company 角色已注册"]),
+            )
+            self.agent_profiles.upsert(AgentProfile.model_validate(payload))
         if not self.assets.list():
             for asset in [
                 {"project_id": project.project_id, "name": "品牌介绍文档", "asset_type": "document", "object_key": "minio://assets/brand-story.pdf", "tags": ["Brand KB", "品牌资料"], "metadata": {"phase": "asset", "source": "brand"}},
@@ -845,13 +851,16 @@ class WorkbenchService:
             for composition_item in self.live_room_compositions.list():
                 self.live_room_compositions.upsert(self._hydrate_live_room(composition_item))
         composition = self.live_room_compositions.list()[0]
-        if not self.prompt_versions.list():
-            prompt = self.prompt_templates.list()[0]
-            for prompt_payload in [
-                {"name": prompt.name, "purpose": prompt.purpose, "version": prompt.version, "content": prompt.content, "variables": prompt.variables, "score": 86, "use_count": 24, "cost_estimate": 18.6, "gmv": 68420, "ctr": 0.12, "cvr": 0.042},
-                {"name": "促单权益 Prompt", "purpose": "sales_push", "version": "v2", "content": "生成限时权益促单话术，强调理性下单和成年人饮酒合规。", "variables": ["product", "benefit", "deadline"], "score": 91, "use_count": 31, "cost_estimate": 21.4, "gmv": 93600, "ctr": 0.148, "cvr": 0.061},
-                {"name": "分镜导演 Prompt", "purpose": "storyboard", "version": "v1", "content": "把直播剧本拆成数字人、商品卡、POP、字幕和镜头节奏。", "variables": ["script", "components"], "score": 84, "use_count": 16, "cost_estimate": 12.7, "gmv": 54200, "ctr": 0.118, "cvr": 0.039},
-            ]:
+        prompt = self.prompt_templates.list()[0]
+        default_prompt_versions = [
+            {"name": prompt.name, "purpose": prompt.purpose, "version": prompt.version, "content": prompt.content, "variables": prompt.variables, "score": 86, "use_count": 24, "cost_estimate": 18.6, "gmv": 68420, "ctr": 0.12, "cvr": 0.042},
+            {"name": "促单权益 Prompt", "purpose": "sales_push", "version": "v2", "content": "生成限时权益促单话术，强调理性下单和成年人饮酒合规。", "variables": ["product", "benefit", "deadline"], "score": 91, "use_count": 31, "cost_estimate": 21.4, "gmv": 93600, "ctr": 0.148, "cvr": 0.061},
+            {"name": "分镜导演 Prompt", "purpose": "storyboard", "version": "v1", "content": "把直播剧本拆成数字人、商品卡、POP、字幕和镜头节奏。", "variables": ["script", "components"], "score": 84, "use_count": 16, "cost_estimate": 12.7, "gmv": 54200, "ctr": 0.118, "cvr": 0.039},
+            {"name": "视觉导演 Prompt", "purpose": "visual_blueprint", "version": "v1", "content": "把 Story、Script、Director Script、Brand、Product、Audience、Emotion、Live Goal、Platform、Scene、Current Assets 和 Runtime Context 转换成 Visual Blueprint；只输出 visual_blueprint YAML，包含 brand、scene、camera、lighting、composition、avatar、product、subtitle、overlay、music、transition、image_prompt、video_prompt、asset_mapping、obs_layers、director_note。", "variables": ["story", "script", "director_script", "brand", "product", "audience", "emotion", "live_goal", "platform", "scene", "current_assets", "runtime_context"], "score": 92, "use_count": 0, "cost_estimate": 0, "gmv": 0, "ctr": 0, "cvr": 0},
+        ]
+        existing_prompt_purposes = {item.purpose for item in self.prompt_versions.list()}
+        for prompt_payload in default_prompt_versions:
+            if prompt_payload["purpose"] not in existing_prompt_purposes:
                 self.prompt_versions.upsert(PromptVersion(prompt_id=prompt.prompt_id, **prompt_payload))
         prompt_version = self.prompt_versions.list()[0]
         workflow_def = self._ensure_phase_five_workflow_definition()
@@ -861,12 +870,12 @@ class WorkbenchService:
                 project_id=project.project_id,
                 workflow_definition_id=workflow_def.workflow_definition_id,
                 status="running",
-                progress=0.4,
-                current_node_id="script",
+                progress=0.45,
+                current_node_id="visual_director",
                 input_payload={"project_id": project.project_id, "product_id": product.product_id, "workflow": "product_to_streaming"},
-                output_payload={"completed_artifacts": ["product_profile", "brand_brief", "brand_story"]},
-                logs=["商品节点已生成 SKU 与卖点快照", "品牌节点已生成信任背书", "故事节点已输出直播叙事主线", "正在生成直播剧本"],
-                token_count=8360,
+                output_payload={"completed_artifacts": ["product_profile", "brand_brief", "brand_story", "live_script", "shot_plan", "director_script"]},
+                logs=["商品节点已生成 SKU 与卖点快照", "品牌节点已生成信任背书", "故事节点已输出直播叙事主线", "剧本、分镜与导演节点已完成", "正在生成 Visual Blueprint"],
+                token_count=10040,
                 cost_estimate=12.8,
                 duration_seconds=420,
             ))
@@ -874,7 +883,7 @@ class WorkbenchService:
         for index, node in enumerate(workflow_def.nodes):
             if node["id"] in existing_node_ids:
                 continue
-            status = "succeeded" if node["id"] in {"product", "brand", "story"} else "running" if node["id"] == "script" else "queued"
+            status = "succeeded" if node["id"] in {"product", "brand", "story", "script", "storyboard", "director"} else "running" if node["id"] == "visual_director" else "queued"
             self.workflow_node_runs.upsert(WorkflowNodeRun(
                 workflow_run_id=workflow_run.workflow_run_id,
                 node_id=node["id"],
