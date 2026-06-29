@@ -48,7 +48,7 @@ Phase 9 MVP 保留为独立的可运行闭环：
 
 ## n8n 图形化编排
 
-`workflows/n8n/` 提供可导入 n8n 的 product-to-streaming workflow 示例。n8n 作为外部图形化编排/演示层展示 Tavern 主链路，并通过现有 API 触发 MVP 闭环；Tavern 后端 `WorkflowDefinition` 仍是主工作流定义来源。
+`workflows/n8n/` 提供可导入 n8n 的 product/brand-to-complete-video workflow 示例。n8n 作为外部图形化编排/演示层展示 Tavern 主链路，并通过 `POST /api/v1/workflow/product-videos/run` 触发商品/品牌资料到完整视频的端到端闭环；Tavern 后端 `WorkflowDefinition` 仍是主工作流定义来源。
 
 ## 本地开发
 
@@ -98,7 +98,7 @@ docker compose -f "D:\Tavern\infra\docker\docker-compose.yml" --env-file "D:\Tav
 - Tavern Web: http://127.0.0.1:5180
 - n8n: http://127.0.0.1:5678
 
-n8n 可导入 `workflows/n8n/tavern-product-to-streaming.workflow.json` 查看并触发 Tavern 主链路示例。
+n8n 可导入 `workflows/n8n/tavern-product-to-streaming.workflow.json` 查看并触发 Tavern 商品/品牌资料到完整视频的主链路示例。
 
 ## 最终架构
 

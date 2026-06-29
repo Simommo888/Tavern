@@ -126,6 +126,57 @@ class WorkbenchApiTests(unittest.TestCase):
             self.assertGreaterEqual(len(overview["avatar_ranking"]), 1)
             self.assertGreaterEqual(len(overview["best_practice_ranking"]), 1)
 
+    def test_product_video_workflow_runs_product_brand_to_complete_video(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            workbench_module._service = WorkbenchService(Path(tmp))
+            client = TestClient(create_app())
+
+            response = client.post("/api/v1/workflow/product-videos/run", json={
+                "brand_name": "龙八",
+                "duration_seconds": 45,
+                "product": {
+                    "product_name": "龙八礼盒",
+                    "sku": "LB-VIDEO-001",
+                    "price": 299,
+                    "original_price": 399,
+                    "aroma_type": "酱香",
+                    "selling_points": ["宴请送礼", "礼盒包装", "直播权益"],
+                    "scenes": ["商务宴请", "节日拜访"],
+                },
+                "brand_profile": {
+                    "positioning": "面向成年人礼赠和宴请场景的可信酒类品牌",
+                    "tone": "高级、可信、克制",
+                },
+            })
+            self.assertEqual(response.status_code, 200)
+            workflow = response.json()["workflow"]
+            self.assertEqual(workflow["run"]["status"], "succeeded")
+            self.assertEqual(workflow["definition"]["version"], "product-video-v1")
+            self.assertEqual(
+                [node["node_id"] for node in workflow["nodes"]],
+                ["product_brand_input", "planner", "story", "script", "director", "visual_director", "asset", "image", "video", "editor"],
+            )
+            self.assertEqual(workflow["nodes"][-1]["output_payload"]["artifact"], "complete_video")
+            self.assertTrue(workflow["final_video"]["uri"].startswith("file://"))
+            self.assertEqual(workflow["final_video"]["status"], "placeholder_ready")
+            self.assertIn("complete_video", workflow["artifacts"])
+            self.assertIn("final_video", workflow["run"]["output_payload"])
+
+            definitions = client.get("/api/v1/workflow/definitions")
+            product_video_definition = next(item for item in definitions.json()["definitions"] if item["version"] == "product-video-v1")
+            self.assertEqual(product_video_definition["nodes"][-1]["id"], "editor")
+            self.assertEqual(product_video_definition["nodes"][-1]["artifact"], "complete_video")
+
+            nodes = client.get(f"/api/v1/workflow/runs/{workflow['run']['workflow_run_id']}/nodes")
+            self.assertEqual(nodes.status_code, 200)
+            self.assertEqual([node["status"] for node in nodes.json()["nodes"]], ["succeeded"] * 10)
+
+            assets = client.get("/api/v1/assets")
+            self.assertEqual(assets.status_code, 200)
+            complete_video_assets = [asset for asset in assets.json()["assets"] if asset["asset_type"] == "video" and "Editor Agent" in asset["tags"]]
+            self.assertTrue(complete_video_assets)
+            self.assertEqual(complete_video_assets[-1]["object_key"], workflow["final_video"]["uri"])
+
     def test_phase_nine_mvp_api_runs_product_to_saved_live_plan(self):
         with tempfile.TemporaryDirectory() as tmp:
             workbench_module._service = WorkbenchService(Path(tmp))

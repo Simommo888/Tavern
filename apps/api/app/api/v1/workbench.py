@@ -272,6 +272,14 @@ def run_mvp_live_commerce(payload: dict[str, Any]) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
+@router.post("/workflow/product-videos/run")
+def run_product_video_workflow(payload: dict[str, Any]) -> dict[str, Any]:
+    try:
+        return {"workflow": _service.run_product_video_workflow(payload)}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
 @router.get("/projects/{project_id}")
 def get_project(project_id: str) -> dict[str, Any]:
     try:

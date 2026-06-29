@@ -8,10 +8,21 @@ from apps.api.app.application.workbench_service import WorkbenchService
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_PATH = ROOT / "workflows" / "n8n" / "tavern-product-to-streaming.workflow.json"
-EXPECTED_STAGES = ["商品", "品牌", "故事", "剧本", "分镜", "导演", "视觉导演", "语音", "数字人", "直播间", "视频", "推流"]
+EXPECTED_STAGES = [
+    "商品/品牌资料",
+    "Planner Agent（任务规划）",
+    "Story Agent（故事生成）",
+    "Script Agent（直播话术）",
+    "Director Agent（镜头拆解）",
+    "Visual Director Agent（画面设计 + Prompt）",
+    "Asset Agent（素材匹配/生成）",
+    "Image Agent（背景/贴图生成）",
+    "Video Agent（镜头视频生成）",
+    "Editor Agent（剪辑/BGM/合成）",
+]
 EXPECTED_API_PATHS = [
     "/api/v1/workflow/definitions",
-    "/api/v1/mvp/live-plans/run",
+    "/api/v1/workflow/product-videos/run",
     "/api/v1/workflow/runs",
 ]
 
@@ -22,7 +33,7 @@ class N8nWorkflowAssetTests(unittest.TestCase):
         workflow = json.loads(WORKFLOW_PATH.read_text(encoding="utf-8"))
 
         self.assertIn("Tavern", workflow["name"])
-        self.assertIn("Product-to-Streaming", workflow["name"])
+        self.assertIn("Complete-Video", workflow["name"])
 
         node_names = [node["name"] for node in workflow["nodes"]]
         self.assertEqual([name.split(" ", 1)[1] for name in node_names if name[:2].isdigit()], EXPECTED_STAGES)
@@ -30,8 +41,9 @@ class N8nWorkflowAssetTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             service = WorkbenchService(Path(tmp))
             definitions = service.workflow_definitions.list()
-            product_to_streaming = next(item for item in definitions if item.version == "phase5-v1")
-        self.assertEqual([node["label"] for node in product_to_streaming.nodes], EXPECTED_STAGES)
+            product_video = next(item for item in definitions if item.version == "product-video-v1")
+        self.assertEqual([node["label"] for node in product_video.nodes], EXPECTED_STAGES)
+        self.assertEqual(product_video.nodes[-1]["artifact"], "complete_video")
 
         serialized = json.dumps(workflow, ensure_ascii=False)
         for api_path in EXPECTED_API_PATHS:

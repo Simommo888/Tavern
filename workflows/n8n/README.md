@@ -29,26 +29,26 @@ docker compose -f "D:\Tavern\infra\docker\docker-compose.yml" --env-file "D:\Tav
 2. 按 n8n 首次启动提示创建 owner，或使用本地 basic auth。
 3. 选择 **Import from File**。
 4. 导入 `D:\Tavern\workflows\n8n\tavern-product-to-streaming.workflow.json`。
-5. 确认画布中出现：商品 → 品牌 → 故事 → 剧本 → 分镜 → 导演 → 视觉导演 → 语音 → 数字人 → 直播间 → 视频 → 推流。
+5. 确认画布中出现：商品/品牌资料 → Planner Agent（任务规划） → Story Agent（故事生成） → Script Agent（直播话术） → Director Agent（镜头拆解） → Visual Director Agent（画面设计 + Prompt） → Asset Agent（素材匹配/生成） → Image Agent（背景/贴图生成） → Video Agent（镜头视频生成） → Editor Agent（剪辑/BGM/合成）。
 
 ## 执行说明
 
 示例 workflow 包含两类节点：
 
-- 12 个 Tavern 主链路展示节点，用来在 n8n 画布中呈现 product-to-streaming DAG。
-- HTTP Request 节点，调用现有 Tavern API：
+- 10 个 Tavern 端到端视频生产展示节点，用来在 n8n 画布中呈现 product/brand-to-complete-video DAG。
+- HTTP Request 节点，调用 Tavern API：
   - `GET /api/v1/workflow/definitions`
-  - `POST /api/v1/mvp/live-plans/run`
+  - `POST /api/v1/workflow/product-videos/run`
   - `GET /api/v1/workflow/runs/{workflow_run_id}/nodes`
   - `GET /api/v1/workflow/runs`
 
 在 Docker Compose 网络内，n8n 通过 `http://api:8770` 访问 Tavern API。如果你在 Docker 外独立运行 n8n，请把 workflow 里的 API base 改为 `http://127.0.0.1:8770`。
 
-执行 manual trigger 后，`Run Tavern MVP live plan` 会复用 Tavern Phase 9 MVP 闭环生成 live plan，并写入 Tavern 的 workflow run/node run 审计数据。你可以在 Tavern Web 的 `/workflow` 或 `/mvp` 页面查看结果。
+执行 manual trigger 后，`Run Tavern complete video workflow` 会触发 Tavern 后端的完整视频闭环：商品/品牌资料进入 Planner、Story、Script、Director、Visual Director、Asset、Image、Video、Editor，最后写入 `complete_video` 产物 URI、workflow run/node run 审计数据与资产中心记录。无外部媒体生成器密钥时，Image/Video/Editor 会生成可追踪的本地占位产物，便于演示和集成验证。
 
 ## 边界
 
 - n8n 示例不是 Tavern workflow runner 的替代品。
 - Tavern 后端 `WorkflowDefinition` 仍是主链路定义来源。
-- 当前可执行闭环复用 `POST /api/v1/mvp/live-plans/run`。
-- 后续如需逐节点驱动 12 步主链路，应先在 Tavern 后端新增通用 workflow trigger/retry API，再让 n8n 调用这些 API。
+- 当前可执行闭环使用 `POST /api/v1/workflow/product-videos/run`。
+- 后续如需真实图片/视频生成，应在 Image Agent / Video Agent 节点接入具体 provider，并保持 `WorkflowRun` 与 `WorkflowNodeRun` 审计契约不变。

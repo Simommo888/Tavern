@@ -1,21 +1,21 @@
 {
-  "id": "tavernProductToStreaming",
-  "name": "Tavern Product-to-Streaming Workflow",
+  "id": "tavernProductBrandToCompleteVideo",
+  "name": "Tavern Product/Brand-to-Complete-Video Workflow",
   "nodes": [
     {
       "parameters": {},
       "id": "manual-trigger",
-      "name": "Start Tavern product-to-streaming demo",
+      "name": "Start Tavern complete video demo",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
       "position": [-1160, 0]
     },
     {
       "parameters": {
-        "jsCode": "return [{\n  json: {\n    tavern_api_base: 'http://api:8770',\n    brand_name: '龙八',\n    product: {\n      product_name: '龙八礼盒',\n      sku: 'LB-N8N-001',\n      price: 299,\n      original_price: 399,\n      aroma_type: '酱香',\n      selling_points: ['宴请送礼', '礼盒包装', '直播权益'],\n      scenes: ['商务宴请', '节日拜访']\n    },\n    tavern_stage_history: []\n  }\n}];"
+        "jsCode": "return [{\n  json: {\n    tavern_api_base: 'http://api:8770',\n    brand_name: '龙八',\n    duration_seconds: 45,\n    aspect_ratio: '9:16',\n    bgm_style: 'premium light corporate',\n    product: {\n      product_name: '龙八礼盒',\n      sku: 'LB-VIDEO-001',\n      price: 299,\n      original_price: 399,\n      aroma_type: '酱香',\n      selling_points: ['宴请送礼', '礼盒包装', '直播权益'],\n      scenes: ['商务宴请', '节日拜访']\n    },\n    brand_profile: {\n      positioning: '面向成年人礼赠和宴请场景的可信酒类品牌',\n      tone: '高级、可信、克制',\n      proof_points: ['品牌背书', '礼盒质感', '直播间权益']\n    },\n    tavern_stage_history: []\n  }\n}];"
       },
       "id": "demo-payload",
-      "name": "Set Tavern demo payload",
+      "name": "Set Tavern video payload",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [-920, 0]
@@ -33,149 +33,129 @@
     },
     {
       "parameters": {
-        "jsCode": "const item = $input.first().json;\nreturn [{ json: { ...item, tavern_stage: { id: 'product', label: '商品', agent: 'Product Agent', artifact: 'product_profile', description: '沉淀 SKU、价格、卖点、FAQ 与合规边界', reusable: true }, tavern_stage_history: [...(item.tavern_stage_history || []), '商品'] } }];"
+        "jsCode": "const item = $input.first().json;\nreturn [{ json: { ...item, tavern_stage: { id: 'product_brand_input', label: '商品/品牌资料', agent: 'Product Agent', artifact: 'product_brand_brief', description: '结构化商品、品牌、卖点、素材与合规边界', reusable: true }, tavern_stage_history: [...(item.tavern_stage_history || []), '商品/品牌资料'] } }];"
       },
-      "id": "stage-product",
-      "name": "01 商品",
+      "id": "stage-product-brand-input",
+      "name": "00 商品/品牌资料",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [-680, 60]
     },
     {
       "parameters": {
-        "jsCode": "const item = $input.first().json;\nreturn [{ json: { ...item, tavern_stage: { id: 'brand', label: '品牌', agent: 'Brand Agent', artifact: 'brand_brief', description: '生成品牌背书、调性、信任证明与人群定位', reusable: true }, tavern_stage_history: [...(item.tavern_stage_history || []), '品牌'] } }];"
+        "jsCode": "const item = $input.first().json;\nreturn [{ json: { ...item, tavern_stage: { id: 'planner', label: 'Planner Agent（任务规划）', agent: 'Planner Agent', artifact: 'run_plan', description: '拆解端到端视频生产任务、依赖、验收标准与产物目录', reusable: true }, tavern_stage_history: [...(item.tavern_stage_history || []), 'Planner Agent（任务规划）'] } }];"
       },
-      "id": "stage-brand",
-      "name": "02 品牌",
+      "id": "stage-planner",
+      "name": "01 Planner Agent（任务规划）",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [-440, 60]
     },
     {
       "parameters": {
-        "jsCode": "const item = $input.first().json;\nreturn [{ json: { ...item, tavern_stage: { id: 'story', label: '故事', agent: 'Story Agent', artifact: 'brand_story', description: '把品牌与商品转成直播间可讲述的故事线', reusable: true }, tavern_stage_history: [...(item.tavern_stage_history || []), '故事'] } }];"
+        "jsCode": "const item = $input.first().json;\nreturn [{ json: { ...item, tavern_stage: { id: 'story', label: 'Story Agent（故事生成）', agent: 'Story Agent', artifact: 'brand_story', description: '把商品和品牌资料生成直播视频故事线', reusable: true }, tavern_stage_history: [...(item.tavern_stage_history || []), 'Story Agent（故事生成）'] } }];"
       },
       "id": "stage-story",
-      "name": "03 故事",
+      "name": "02 Story Agent（故事生成）",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [-200, 60]
     },
     {
       "parameters": {
-        "jsCode": "const item = $input.first().json;\nreturn [{ json: { ...item, tavern_stage: { id: 'script', label: '剧本', agent: 'Script Agent', artifact: 'live_script', description: '输出开场、讲品、促单、互动和收口口播', reusable: true }, tavern_stage_history: [...(item.tavern_stage_history || []), '剧本'] } }];"
+        "jsCode": "const item = $input.first().json;\nreturn [{ json: { ...item, tavern_stage: { id: 'script', label: 'Script Agent（直播话术）', agent: 'Script Agent', artifact: 'live_script', description: '生成数字人可朗读的直播话术、CTA 与合规提示', reusable: true }, tavern_stage_history: [...(item.tavern_stage_history || []), 'Script Agent（直播话术）'] } }];"
       },
       "id": "stage-script",
-      "name": "04 剧本",
+      "name": "03 Script Agent（直播话术）",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [40, 60]
     },
     {
       "parameters": {
-        "jsCode": "const item = $input.first().json;\nreturn [{ json: { ...item, tavern_stage: { id: 'storyboard', label: '分镜', agent: 'Storyboard Agent', artifact: 'shot_plan', description: '拆解镜头、字幕、视觉层和转场节奏', reusable: true }, tavern_stage_history: [...(item.tavern_stage_history || []), '分镜'] } }];"
+        "jsCode": "const item = $input.first().json;\nreturn [{ json: { ...item, tavern_stage: { id: 'director', label: 'Director Agent（镜头拆解）', agent: 'Director Agent', artifact: 'shot_plan', description: '拆解镜头、表演、字幕、转场与生产顺序', reusable: true }, tavern_stage_history: [...(item.tavern_stage_history || []), 'Director Agent（镜头拆解）'] } }];"
       },
-      "id": "stage-storyboard",
-      "name": "05 分镜",
+      "id": "stage-director",
+      "name": "04 Director Agent（镜头拆解）",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [280, 60]
     },
     {
       "parameters": {
-        "jsCode": "const item = $input.first().json;\nreturn [{ json: { ...item, tavern_stage: { id: 'director', label: '导演', agent: 'Director Agent', artifact: 'director_script', description: '协调镜头、节奏、表演与生产顺序', reusable: true }, tavern_stage_history: [...(item.tavern_stage_history || []), '导演'] } }];"
+        "jsCode": "const item = $input.first().json;\nreturn [{ json: { ...item, tavern_stage: { id: 'visual_director', label: 'Visual Director Agent（画面设计 + Prompt）', agent: 'Visual Director Agent', artifact: 'visual_blueprint', description: '输出画面设计、图片 Prompt、视频 Prompt、OBS 图层和视觉统一规则', reusable: true }, tavern_stage_history: [...(item.tavern_stage_history || []), 'Visual Director Agent（画面设计 + Prompt）'] } }];"
       },
-      "id": "stage-director",
-      "name": "06 导演",
+      "id": "stage-visual-director",
+      "name": "05 Visual Director Agent（画面设计 + Prompt）",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [520, 60]
     },
     {
       "parameters": {
-        "jsCode": "const item = $input.first().json;\nreturn [{ json: { ...item, tavern_stage: { id: 'visual_director', label: '视觉导演', agent: 'Visual Director Agent', artifact: 'visual_blueprint', description: '生成品牌统一的 Visual Blueprint、Prompt、Asset Mapping 与 OBS 图层', reusable: true }, tavern_stage_history: [...(item.tavern_stage_history || []), '视觉导演'] } }];"
+        "jsCode": "const item = $input.first().json;\nreturn [{ json: { ...item, tavern_stage: { id: 'asset', label: 'Asset Agent（素材匹配/生成）', agent: 'Asset Agent', artifact: 'asset_manifest', description: '匹配输入素材并生成缺口素材清单', reusable: true }, tavern_stage_history: [...(item.tavern_stage_history || []), 'Asset Agent（素材匹配/生成）'] } }];"
       },
-      "id": "stage-visual-director",
-      "name": "07 视觉导演",
+      "id": "stage-asset",
+      "name": "06 Asset Agent（素材匹配/生成）",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [760, 60]
     },
     {
       "parameters": {
-        "jsCode": "const item = $input.first().json;\nreturn [{ json: { ...item, tavern_stage: { id: 'voice', label: '语音', agent: 'Voice Agent', artifact: 'speech_audio', description: '将口播剧本交给 TTS provider 生成语音素材', reusable: false }, tavern_stage_history: [...(item.tavern_stage_history || []), '语音'] } }];"
+        "jsCode": "const item = $input.first().json;\nreturn [{ json: { ...item, tavern_stage: { id: 'image', label: 'Image Agent（背景/贴图生成）', agent: 'Image Agent', artifact: 'image_assets', description: '生成背景、贴图、商品卡和视觉层占位产物', reusable: false }, tavern_stage_history: [...(item.tavern_stage_history || []), 'Image Agent（背景/贴图生成）'] } }];"
       },
-      "id": "stage-voice",
-      "name": "08 语音",
+      "id": "stage-image",
+      "name": "07 Image Agent（背景/贴图生成）",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [1000, 60]
     },
     {
       "parameters": {
-        "jsCode": "const item = $input.first().json;\nreturn [{ json: { ...item, tavern_stage: { id: 'avatar', label: '数字人', agent: 'Avatar Agent', artifact: 'avatar_clip', description: '驱动数字人主播生成口播片段', reusable: false }, tavern_stage_history: [...(item.tavern_stage_history || []), '数字人'] } }];"
+        "jsCode": "const item = $input.first().json;\nreturn [{ json: { ...item, tavern_stage: { id: 'video', label: 'Video Agent（镜头视频生成）', agent: 'Video Agent', artifact: 'shot_clips', description: '按镜头计划生成镜头视频占位产物', reusable: false }, tavern_stage_history: [...(item.tavern_stage_history || []), 'Video Agent（镜头视频生成）'] } }];"
       },
-      "id": "stage-avatar",
-      "name": "09 数字人",
+      "id": "stage-video",
+      "name": "08 Video Agent（镜头视频生成）",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [1240, 60]
     },
     {
       "parameters": {
-        "jsCode": "const item = $input.first().json;\nreturn [{ json: { ...item, tavern_stage: { id: 'live_room', label: '直播间', agent: 'Scene Agent', artifact: 'live_room_composition', description: '组合背景、商品卡、权益 POP 与数字人图层', reusable: true }, tavern_stage_history: [...(item.tavern_stage_history || []), '直播间'] } }];"
+        "jsCode": "const item = $input.first().json;\nreturn [{ json: { ...item, tavern_stage: { id: 'editor', label: 'Editor Agent（剪辑/BGM/合成）', agent: 'Editor Agent', artifact: 'complete_video', description: '剪辑镜头、字幕、BGM、转场并输出完整视频', reusable: false }, tavern_stage_history: [...(item.tavern_stage_history || []), 'Editor Agent（剪辑/BGM/合成）'] } }];"
       },
-      "id": "stage-live-room",
-      "name": "10 直播间",
+      "id": "stage-editor",
+      "name": "09 Editor Agent（剪辑/BGM/合成）",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [1480, 60]
     },
     {
       "parameters": {
-        "jsCode": "const item = $input.first().json;\nreturn [{ json: { ...item, tavern_stage: { id: 'video', label: '视频', agent: 'Composer Agent', artifact: 'composed_video', description: '用视频 provider/FFmpeg wrapper 合成完整直播视频', reusable: false }, tavern_stage_history: [...(item.tavern_stage_history || []), '视频'] } }];"
+        "method": "POST",
+        "url": "={{$json.tavern_api_base}}/api/v1/workflow/product-videos/run",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { brand_name: $json.brand_name, product: $json.product, brand_profile: $json.brand_profile, duration_seconds: $json.duration_seconds, aspect_ratio: $json.aspect_ratio, bgm_style: $json.bgm_style } }}",
+        "options": {}
       },
-      "id": "stage-video",
-      "name": "11 视频",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "id": "run-complete-video-workflow",
+      "name": "Run Tavern complete video workflow",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
       "position": [1720, 60]
     },
     {
       "parameters": {
-        "jsCode": "const item = $input.first().json;\nreturn [{ json: { ...item, tavern_stage: { id: 'streaming', label: '推流', agent: 'Streaming Agent', artifact: 'stream_publish_plan', description: '生成 OBS/RTMP/平台开播检查与推流方案', reusable: false }, tavern_stage_history: [...(item.tavern_stage_history || []), '推流'] } }];"
-      },
-      "id": "stage-streaming",
-      "name": "12 推流",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [1960, 60]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "={{$json.tavern_api_base}}/api/v1/mvp/live-plans/run",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ { brand_name: $json.brand_name, product: $json.product } }}",
-        "options": {}
-      },
-      "id": "run-mvp-live-plan",
-      "name": "Run Tavern MVP live plan",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [2200, 60]
-    },
-    {
-      "parameters": {
-        "url": "={{$node[\"Set Tavern demo payload\"].json.tavern_api_base}}/api/v1/workflow/runs/{{$json.plan.workflow_run_id}}/nodes",
+        "url": "={{$node[\"Set Tavern video payload\"].json.tavern_api_base}}/api/v1/workflow/runs/{{$json.workflow.run.workflow_run_id}}/nodes",
         "options": {}
       },
       "id": "read-current-run-node-runs",
       "name": "Read current run node runs",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2440, 60]
+      "position": [1960, 60]
     },
     {
       "parameters": {
@@ -186,79 +166,31 @@
       "name": "List Tavern workflow runs",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2680, 60]
+      "position": [2200, 60]
     }
   ],
   "connections": {
-    "Start Tavern product-to-streaming demo": {
-      "main": [
-        [
-          {
-            "node": "Set Tavern demo payload",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "Start Tavern complete video demo": {
+      "main": [[{"node": "Set Tavern video payload", "type": "main", "index": 0}]]
     },
-    "Set Tavern demo payload": {
-      "main": [
-        [
-          {
-            "node": "Read Tavern workflow definitions",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "01 商品",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "Set Tavern video payload": {
+      "main": [[
+        {"node": "Read Tavern workflow definitions", "type": "main", "index": 0},
+        {"node": "00 商品/品牌资料", "type": "main", "index": 0}
+      ]]
     },
-    "01 商品": {
-      "main": [[{"node": "02 品牌", "type": "main", "index": 0}]]
-    },
-    "02 品牌": {
-      "main": [[{"node": "03 故事", "type": "main", "index": 0}]]
-    },
-    "03 故事": {
-      "main": [[{"node": "04 剧本", "type": "main", "index": 0}]]
-    },
-    "04 剧本": {
-      "main": [[{"node": "05 分镜", "type": "main", "index": 0}]]
-    },
-    "05 分镜": {
-      "main": [[{"node": "06 导演", "type": "main", "index": 0}]]
-    },
-    "06 导演": {
-      "main": [[{"node": "07 视觉导演", "type": "main", "index": 0}]]
-    },
-    "07 视觉导演": {
-      "main": [[{"node": "08 语音", "type": "main", "index": 0}]]
-    },
-    "08 语音": {
-      "main": [[{"node": "09 数字人", "type": "main", "index": 0}]]
-    },
-    "09 数字人": {
-      "main": [[{"node": "10 直播间", "type": "main", "index": 0}]]
-    },
-    "10 直播间": {
-      "main": [[{"node": "11 视频", "type": "main", "index": 0}]]
-    },
-    "11 视频": {
-      "main": [[{"node": "12 推流", "type": "main", "index": 0}]]
-    },
-    "12 推流": {
-      "main": [[{"node": "Run Tavern MVP live plan", "type": "main", "index": 0}]]
-    },
-    "Run Tavern MVP live plan": {
-      "main": [[{"node": "Read current run node runs", "type": "main", "index": 0}]]
-    },
-    "Read current run node runs": {
-      "main": [[{"node": "List Tavern workflow runs", "type": "main", "index": 0}]]
-    }
+    "00 商品/品牌资料": {"main": [[{"node": "01 Planner Agent（任务规划）", "type": "main", "index": 0}]]},
+    "01 Planner Agent（任务规划）": {"main": [[{"node": "02 Story Agent（故事生成）", "type": "main", "index": 0}]]},
+    "02 Story Agent（故事生成）": {"main": [[{"node": "03 Script Agent（直播话术）", "type": "main", "index": 0}]]},
+    "03 Script Agent（直播话术）": {"main": [[{"node": "04 Director Agent（镜头拆解）", "type": "main", "index": 0}]]},
+    "04 Director Agent（镜头拆解）": {"main": [[{"node": "05 Visual Director Agent（画面设计 + Prompt）", "type": "main", "index": 0}]]},
+    "05 Visual Director Agent（画面设计 + Prompt）": {"main": [[{"node": "06 Asset Agent（素材匹配/生成）", "type": "main", "index": 0}]]},
+    "06 Asset Agent（素材匹配/生成）": {"main": [[{"node": "07 Image Agent（背景/贴图生成）", "type": "main", "index": 0}]]},
+    "07 Image Agent（背景/贴图生成）": {"main": [[{"node": "08 Video Agent（镜头视频生成）", "type": "main", "index": 0}]]},
+    "08 Video Agent（镜头视频生成）": {"main": [[{"node": "09 Editor Agent（剪辑/BGM/合成）", "type": "main", "index": 0}]]},
+    "09 Editor Agent（剪辑/BGM/合成）": {"main": [[{"node": "Run Tavern complete video workflow", "type": "main", "index": 0}]]},
+    "Run Tavern complete video workflow": {"main": [[{"node": "Read current run node runs", "type": "main", "index": 0}]]},
+    "Read current run node runs": {"main": [[{"node": "List Tavern workflow runs", "type": "main", "index": 0}]]}
   },
   "settings": {
     "executionOrder": "v1"
@@ -266,21 +198,19 @@
   "staticData": null,
   "pinData": {},
   "active": false,
-  "versionId": "tavern-product-to-streaming-v1",
+  "versionId": "tavern-product-brand-to-complete-video-v1",
   "meta": {
     "templateCredsSetupCompleted": true,
     "tavern": {
-      "workflow": "product_to_streaming",
+      "workflow": "product_brand_to_complete_video",
       "apiBaseInsideDocker": "http://api:8770",
-      "apiBaseFromHost": "http://127.0.0.1:8770"
+      "apiBaseFromHost": "http://127.0.0.1:8770",
+      "finalArtifact": "complete_video"
     }
   },
   "tags": [
-    {
-      "name": "Tavern"
-    },
-    {
-      "name": "product-to-streaming"
-    }
+    {"name": "Tavern"},
+    {"name": "product-brand-to-complete-video"},
+    {"name": "n8n"}
   ]
 }
