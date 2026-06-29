@@ -259,7 +259,7 @@ class WorkbenchApiTests(unittest.TestCase):
             workbench_module._service = WorkbenchService(Path(tmp))
             client = TestClient(create_app())
 
-            with patch.dict(os.environ, {"OPENAI_API_KEY": "", "TAVERN_JIMENG_API_KEY": "", "TAVERN_JIMENG_ACCESS_KEY": "", "TAVERN_JIMENG_SECRET_KEY": ""}, clear=False):
+            with patch.dict(os.environ, {"OPENAI_API_KEY": "", "TAVERN_JIMENG_API_KEY": "", "TAVERN_JIMENG_ACCESS_KEY": "", "TAVERN_JIMENG_SECRET_KEY": "", "TAVERN_FORCE_PLACEHOLDER_MEDIA": "true"}, clear=False):
                 response = client.post("/api/v1/workflow/product-videos/run", json={"brand_name": "龙八", "product": {"product_name": "龙八礼盒", "sku": "LB-FALLBACK-001", "price": 299}})
 
             self.assertEqual(response.status_code, 200)

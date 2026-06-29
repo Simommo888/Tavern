@@ -7,6 +7,7 @@ import re
 from typing import Any
 
 from agent_runtime.agent_company import build_default_agent_company
+from agent_runtime.config import image_api_key, image_base_url, video_api_key, video_base_url
 from interfaces.production import utc_now_iso
 from apps.api.app.core.logging import get_logger
 from apps.api.app.domain.workbench.entities import (
@@ -668,7 +669,7 @@ class WorkbenchService:
         image_dir = artifact_root / "images"
         image_dir.mkdir(parents=True, exist_ok=True)
         outputs = []
-        provider = "openai_image" if _openai_image_enabled() else "placeholder_image"
+        provider = "openai_image" if _openai_image_enabled(str(self.workspace_root)) else "placeholder_image"
         errors: list[dict[str, str]] = []
         for prompt in visual_blueprint.get("image_prompts", []):
             image_id = str(prompt.get("id") or f"image_{len(outputs) + 1}")
@@ -680,10 +681,10 @@ class WorkbenchService:
                     generated = generate_openai_image(
                         prompt=prompt_text,
                         output_path=image_path,
-                        api_key=str(os.environ.get("OPENAI_API_KEY") or ""),
+                        api_key=_openai_image_api_key(str(self.workspace_root)),
                         model=str(os.environ.get("TAVERN_OPENAI_IMAGE_MODEL") or "gpt-image-1"),
                         size=str(os.environ.get("TAVERN_OPENAI_IMAGE_SIZE") or _image_size_for_canvas(visual_blueprint)),
-                        base_url=str(os.environ.get("TAVERN_OPENAI_IMAGE_BASE_URL") or os.environ.get("TAVERN_OPENAI_BASE_URL") or ""),
+                        base_url=_openai_image_base_url(str(self.workspace_root)),
                         timeout_seconds=float(os.environ.get("TAVERN_MEDIA_TIMEOUT_SECONDS") or 300),
                     )
                     uri = generated.uri
@@ -715,7 +716,7 @@ class WorkbenchService:
         video_dir = artifact_root / "clips"
         video_dir.mkdir(parents=True, exist_ok=True)
         clips = []
-        provider = "jimeng_ai" if _jimeng_video_enabled() else "placeholder_video"
+        provider = "jimeng_ai" if _jimeng_video_enabled(str(self.workspace_root)) else "placeholder_video"
         errors: list[dict[str, str]] = []
         prompts_by_shot = {str(item.get("shot_id")): item for item in visual_blueprint.get("video_prompts", [])}
         for shot in director_plan.get("shots", []):
@@ -732,8 +733,8 @@ class WorkbenchService:
                     generated = generate_jimeng_video(
                         prompt=prompt_text,
                         output_path=clip_path,
-                        api_key=str(os.environ.get("TAVERN_JIMENG_API_KEY") or ""),
-                        base_url=str(os.environ.get("TAVERN_JIMENG_BASE_URL") or "https://visual.volcengineapi.com"),
+                        api_key=_jimeng_video_api_key(str(self.workspace_root)),
+                        base_url=_jimeng_video_base_url(str(self.workspace_root)),
                         model=str(os.environ.get("TAVERN_JIMENG_VIDEO_MODEL") or "jimeng-video"),
                         req_key=str(os.environ.get("TAVERN_JIMENG_REQ_KEY") or "jimeng_t2v_v30"),
                         submit_action=str(os.environ.get("TAVERN_JIMENG_SUBMIT_ACTION") or "CVSync2AsyncSubmitTask"),
@@ -1751,12 +1752,28 @@ def _env_bool(name: str, default: bool = False) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on", "enabled"}
 
 
-def _openai_image_enabled() -> bool:
-    return bool(os.environ.get("OPENAI_API_KEY")) and not _env_bool("TAVERN_FORCE_PLACEHOLDER_MEDIA", False)
+def _openai_image_api_key(workspace_root: str = ".") -> str:
+    return os.environ.get("OPENAI_API_KEY") or image_api_key(workspace_root)
 
 
-def _jimeng_video_enabled() -> bool:
-    has_bearer = bool(os.environ.get("TAVERN_JIMENG_API_KEY"))
+def _openai_image_base_url(workspace_root: str = ".") -> str:
+    return os.environ.get("TAVERN_OPENAI_IMAGE_BASE_URL") or os.environ.get("TAVERN_OPENAI_BASE_URL") or image_base_url(workspace_root)
+
+
+def _jimeng_video_api_key(workspace_root: str = ".") -> str:
+    return os.environ.get("TAVERN_JIMENG_API_KEY") or video_api_key(workspace_root)
+
+
+def _jimeng_video_base_url(workspace_root: str = ".") -> str:
+    return os.environ.get("TAVERN_JIMENG_BASE_URL") or video_base_url(workspace_root) or "https://visual.volcengineapi.com"
+
+
+def _openai_image_enabled(workspace_root: str = ".") -> bool:
+    return bool(_openai_image_api_key(workspace_root)) and not _env_bool("TAVERN_FORCE_PLACEHOLDER_MEDIA", False)
+
+
+def _jimeng_video_enabled(workspace_root: str = ".") -> bool:
+    has_bearer = bool(_jimeng_video_api_key(workspace_root))
     has_volc_keys = bool(os.environ.get("TAVERN_JIMENG_ACCESS_KEY") and os.environ.get("TAVERN_JIMENG_SECRET_KEY"))
     return (has_bearer or has_volc_keys) and not _env_bool("TAVERN_FORCE_PLACEHOLDER_MEDIA", False)
 
