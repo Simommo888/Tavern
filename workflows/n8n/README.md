@@ -14,6 +14,8 @@ docker compose -f "D:\Tavern\infra\docker\docker-compose.yml" --env-file "D:\Tav
 - Tavern Web: http://127.0.0.1:5180
 - n8n: http://127.0.0.1:5678
 
+如果本机已有其他 n8n 占用 `5678`，可设置 `N8N_HOST_PORT=5679` 并同步调整 `N8N_EDITOR_BASE_URL`、`N8N_WEBHOOK_URL` 后再启动。
+
 本地 basic auth 默认值：
 
 - 用户名：`tavern`

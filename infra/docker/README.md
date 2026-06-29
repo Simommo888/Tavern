@@ -53,6 +53,15 @@ docker compose -f infra/docker/docker-compose.yml --env-file infra/docker/.env.e
 
 n8n 容器内访问 Tavern API 使用 `http://api:8770`；如果在 Docker 外独立运行 n8n，请把 workflow 里的 API base 改为 `http://127.0.0.1:8770`。
 
+如果本机已有其他 n8n 占用 `5678`，可以临时改用其他宿主机端口启动：
+
+```powershell
+$env:N8N_HOST_PORT="5679"
+$env:N8N_EDITOR_BASE_URL="http://127.0.0.1:5679/"
+$env:N8N_WEBHOOK_URL="http://127.0.0.1:5679/"
+docker compose -f "D:\Tavern\infra\docker\docker-compose.yml" --env-file "D:\Tavern\infra\docker\.env.example" up -d n8n
+```
+
 ## 数据库初始化
 
 PostgreSQL 首次启动会执行：

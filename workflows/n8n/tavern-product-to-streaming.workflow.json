@@ -1,4 +1,5 @@
 {
+  "id": "tavernProductToStreaming",
   "name": "Tavern Product-to-Streaming Workflow",
   "nodes": [
     {
