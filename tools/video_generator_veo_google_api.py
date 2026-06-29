@@ -93,12 +93,14 @@ class VideoGeneratorVeoGoogleAPI:
                 )
                 break
             except ClientError as e:
-                if e.status_code == 429 and attempt < max_retries - 1:
+                status_code = _client_error_status_code(e)
+                if status_code == 429 and attempt < max_retries - 1:
                     wait_time = retry_delay * (2 ** attempt)
                     logging.warning(f"Rate limit hit (429), retrying in {wait_time}s... (attempt {attempt + 1}/{max_retries})")
                     await asyncio.sleep(wait_time)
                 else:
-                    raise
+                    logging.error("Veo video generation request failed: %s", _client_error_summary(e))
+                    raise RuntimeError(f"Veo video generation request failed: {_client_error_summary(e)}") from e
 
         while not operation.done:
             await asyncio.sleep(2)
@@ -130,3 +132,35 @@ class VideoGeneratorVeoGoogleAPI:
             data=generated_video.video.video_bytes,
         )
         return video_output
+
+
+def _client_error_status_code(error: ClientError) -> int | None:
+    for attr in ("status_code", "code"):
+        value = getattr(error, attr, None)
+        if isinstance(value, int):
+            return value
+        if isinstance(value, str) and value.isdigit():
+            return int(value)
+    response = getattr(error, "response", None)
+    value = getattr(response, "status_code", None)
+    if isinstance(value, int):
+        return value
+    return None
+
+
+def _client_error_summary(error: ClientError) -> str:
+    status_code = _client_error_status_code(error)
+    parts = []
+    if status_code is not None:
+        parts.append(f"status={status_code}")
+    for attr in ("message", "details"):
+        value = getattr(error, attr, None)
+        if value:
+            parts.append(f"{attr}={value}")
+    response = getattr(error, "response", None)
+    response_text = getattr(response, "text", None)
+    if response_text:
+        parts.append(f"response={str(response_text)[:500]}")
+    if not parts:
+        parts.append(str(error))
+    return "; ".join(parts)
