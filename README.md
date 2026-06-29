@@ -46,6 +46,10 @@ Phase 9 MVP 保留为独立的可运行闭环：
 
 在 Web 控制台打开 `/mvp`，即可通过现有 Plugin Manager / Avatar Job / LiveRoom Composition / FFmpeg wrapper 边界运行该流程。
 
+## n8n 图形化编排
+
+`workflows/n8n/` 提供可导入 n8n 的 product-to-streaming workflow 示例。n8n 作为外部图形化编排/演示层展示 Tavern 主链路，并通过现有 API 触发 MVP 闭环；Tavern 后端 `WorkflowDefinition` 仍是主工作流定义来源。
+
 ## 本地开发
 
 ```powershell
@@ -87,6 +91,14 @@ npm --prefix "D:\Tavern\apps\web" run build
 ```powershell
 docker compose -f "D:\Tavern\infra\docker\docker-compose.yml" --env-file "D:\Tavern\infra\docker\.env.example" up --build
 ```
+
+本地服务地址：
+
+- Tavern API: http://127.0.0.1:8770
+- Tavern Web: http://127.0.0.1:5180
+- n8n: http://127.0.0.1:5678
+
+n8n 可导入 `workflows/n8n/tavern-product-to-streaming.workflow.json` 查看并触发 Tavern 主链路示例。
 
 ## 最终架构
 

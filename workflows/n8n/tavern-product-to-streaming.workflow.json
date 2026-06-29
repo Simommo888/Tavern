@@ -1,0 +1,285 @@
+{
+  "name": "Tavern Product-to-Streaming Workflow",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual-trigger",
+      "name": "Start Tavern product-to-streaming demo",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-1160, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{\n  json: {\n    tavern_api_base: 'http://api:8770',\n    brand_name: '龙八',\n    product: {\n      product_name: '龙八礼盒',\n      sku: 'LB-N8N-001',\n      price: 299,\n      original_price: 399,\n      aroma_type: '酱香',\n      selling_points: ['宴请送礼', '礼盒包装', '直播权益'],\n      scenes: ['商务宴请', '节日拜访']\n    },\n    tavern_stage_history: []\n  }\n}];"
+      },
+      "id": "demo-payload",
+      "name": "Set Tavern demo payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-920, 0]
+    },
+    {
+      "parameters": {
+        "url": "={{$json.tavern_api_base}}/api/v1/workflow/definitions",
+        "options": {}
+      },
+      "id": "read-workflow-definitions",
+      "name": "Read Tavern workflow definitions",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-680, -220]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nreturn [{ json: { ...item, tavern_stage: { id: 'product', label: '商品', agent: 'Product Agent', artifact: 'product_profile', description: '沉淀 SKU、价格、卖点、FAQ 与合规边界', reusable: true }, tavern_stage_history: [...(item.tavern_stage_history || []), '商品'] } }];"
+      },
+      "id": "stage-product",
+      "name": "01 商品",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-680, 60]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nreturn [{ json: { ...item, tavern_stage: { id: 'brand', label: '品牌', agent: 'Brand Agent', artifact: 'brand_brief', description: '生成品牌背书、调性、信任证明与人群定位', reusable: true }, tavern_stage_history: [...(item.tavern_stage_history || []), '品牌'] } }];"
+      },
+      "id": "stage-brand",
+      "name": "02 品牌",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-440, 60]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nreturn [{ json: { ...item, tavern_stage: { id: 'story', label: '故事', agent: 'Story Agent', artifact: 'brand_story', description: '把品牌与商品转成直播间可讲述的故事线', reusable: true }, tavern_stage_history: [...(item.tavern_stage_history || []), '故事'] } }];"
+      },
+      "id": "stage-story",
+      "name": "03 故事",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-200, 60]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nreturn [{ json: { ...item, tavern_stage: { id: 'script', label: '剧本', agent: 'Script Agent', artifact: 'live_script', description: '输出开场、讲品、促单、互动和收口口播', reusable: true }, tavern_stage_history: [...(item.tavern_stage_history || []), '剧本'] } }];"
+      },
+      "id": "stage-script",
+      "name": "04 剧本",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [40, 60]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nreturn [{ json: { ...item, tavern_stage: { id: 'storyboard', label: '分镜', agent: 'Storyboard Agent', artifact: 'shot_plan', description: '拆解镜头、字幕、视觉层和转场节奏', reusable: true }, tavern_stage_history: [...(item.tavern_stage_history || []), '分镜'] } }];"
+      },
+      "id": "stage-storyboard",
+      "name": "05 分镜",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [280, 60]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nreturn [{ json: { ...item, tavern_stage: { id: 'director', label: '导演', agent: 'Director Agent', artifact: 'director_script', description: '协调镜头、节奏、表演与生产顺序', reusable: true }, tavern_stage_history: [...(item.tavern_stage_history || []), '导演'] } }];"
+      },
+      "id": "stage-director",
+      "name": "06 导演",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [520, 60]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nreturn [{ json: { ...item, tavern_stage: { id: 'visual_director', label: '视觉导演', agent: 'Visual Director Agent', artifact: 'visual_blueprint', description: '生成品牌统一的 Visual Blueprint、Prompt、Asset Mapping 与 OBS 图层', reusable: true }, tavern_stage_history: [...(item.tavern_stage_history || []), '视觉导演'] } }];"
+      },
+      "id": "stage-visual-director",
+      "name": "07 视觉导演",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [760, 60]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nreturn [{ json: { ...item, tavern_stage: { id: 'voice', label: '语音', agent: 'Voice Agent', artifact: 'speech_audio', description: '将口播剧本交给 TTS provider 生成语音素材', reusable: false }, tavern_stage_history: [...(item.tavern_stage_history || []), '语音'] } }];"
+      },
+      "id": "stage-voice",
+      "name": "08 语音",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1000, 60]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nreturn [{ json: { ...item, tavern_stage: { id: 'avatar', label: '数字人', agent: 'Avatar Agent', artifact: 'avatar_clip', description: '驱动数字人主播生成口播片段', reusable: false }, tavern_stage_history: [...(item.tavern_stage_history || []), '数字人'] } }];"
+      },
+      "id": "stage-avatar",
+      "name": "09 数字人",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1240, 60]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nreturn [{ json: { ...item, tavern_stage: { id: 'live_room', label: '直播间', agent: 'Scene Agent', artifact: 'live_room_composition', description: '组合背景、商品卡、权益 POP 与数字人图层', reusable: true }, tavern_stage_history: [...(item.tavern_stage_history || []), '直播间'] } }];"
+      },
+      "id": "stage-live-room",
+      "name": "10 直播间",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1480, 60]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nreturn [{ json: { ...item, tavern_stage: { id: 'video', label: '视频', agent: 'Composer Agent', artifact: 'composed_video', description: '用视频 provider/FFmpeg wrapper 合成完整直播视频', reusable: false }, tavern_stage_history: [...(item.tavern_stage_history || []), '视频'] } }];"
+      },
+      "id": "stage-video",
+      "name": "11 视频",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1720, 60]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nreturn [{ json: { ...item, tavern_stage: { id: 'streaming', label: '推流', agent: 'Streaming Agent', artifact: 'stream_publish_plan', description: '生成 OBS/RTMP/平台开播检查与推流方案', reusable: false }, tavern_stage_history: [...(item.tavern_stage_history || []), '推流'] } }];"
+      },
+      "id": "stage-streaming",
+      "name": "12 推流",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1960, 60]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$json.tavern_api_base}}/api/v1/mvp/live-plans/run",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { brand_name: $json.brand_name, product: $json.product } }}",
+        "options": {}
+      },
+      "id": "run-mvp-live-plan",
+      "name": "Run Tavern MVP live plan",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2200, 60]
+    },
+    {
+      "parameters": {
+        "url": "={{$node[\"Set Tavern demo payload\"].json.tavern_api_base}}/api/v1/workflow/runs/{{$json.plan.workflow_run_id}}/nodes",
+        "options": {}
+      },
+      "id": "read-current-run-node-runs",
+      "name": "Read current run node runs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2440, 60]
+    },
+    {
+      "parameters": {
+        "url": "http://api:8770/api/v1/workflow/runs",
+        "options": {}
+      },
+      "id": "list-workflow-runs",
+      "name": "List Tavern workflow runs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2680, 60]
+    }
+  ],
+  "connections": {
+    "Start Tavern product-to-streaming demo": {
+      "main": [
+        [
+          {
+            "node": "Set Tavern demo payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Tavern demo payload": {
+      "main": [
+        [
+          {
+            "node": "Read Tavern workflow definitions",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "01 商品",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "01 商品": {
+      "main": [[{"node": "02 品牌", "type": "main", "index": 0}]]
+    },
+    "02 品牌": {
+      "main": [[{"node": "03 故事", "type": "main", "index": 0}]]
+    },
+    "03 故事": {
+      "main": [[{"node": "04 剧本", "type": "main", "index": 0}]]
+    },
+    "04 剧本": {
+      "main": [[{"node": "05 分镜", "type": "main", "index": 0}]]
+    },
+    "05 分镜": {
+      "main": [[{"node": "06 导演", "type": "main", "index": 0}]]
+    },
+    "06 导演": {
+      "main": [[{"node": "07 视觉导演", "type": "main", "index": 0}]]
+    },
+    "07 视觉导演": {
+      "main": [[{"node": "08 语音", "type": "main", "index": 0}]]
+    },
+    "08 语音": {
+      "main": [[{"node": "09 数字人", "type": "main", "index": 0}]]
+    },
+    "09 数字人": {
+      "main": [[{"node": "10 直播间", "type": "main", "index": 0}]]
+    },
+    "10 直播间": {
+      "main": [[{"node": "11 视频", "type": "main", "index": 0}]]
+    },
+    "11 视频": {
+      "main": [[{"node": "12 推流", "type": "main", "index": 0}]]
+    },
+    "12 推流": {
+      "main": [[{"node": "Run Tavern MVP live plan", "type": "main", "index": 0}]]
+    },
+    "Run Tavern MVP live plan": {
+      "main": [[{"node": "Read current run node runs", "type": "main", "index": 0}]]
+    },
+    "Read current run node runs": {
+      "main": [[{"node": "List Tavern workflow runs", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "pinData": {},
+  "active": false,
+  "versionId": "tavern-product-to-streaming-v1",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "tavern": {
+      "workflow": "product_to_streaming",
+      "apiBaseInsideDocker": "http://api:8770",
+      "apiBaseFromHost": "http://127.0.0.1:8770"
+    }
+  },
+  "tags": [
+    {
+      "name": "Tavern"
+    },
+    {
+      "name": "product-to-streaming"
+    }
+  ]
+}

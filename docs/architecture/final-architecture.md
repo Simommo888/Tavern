@@ -146,11 +146,14 @@ docker compose -f infra/docker/docker-compose.yml --env-file infra/docker/.env.e
 
 - `api`：FastAPI，`/ready` 健康检查
 - `web`：支持 standalone build 的 Next.js，`/` 健康检查
+- `n8n`：外部图形化 workflow UI，`/healthz` 健康检查，状态持久化到 `n8n-data`
 - `worker`：可选 profile
 - `postgres`
 - `redis`
 - `rabbitmq`
 - `minio`
+
+n8n 是本地集成/演示层，用于导入 `workflows/n8n/` 中的 visual workflow assets 并调用 Tavern API。Tavern 后端 `WorkflowDefinition` 仍是商品到推流主链路的定义来源，n8n workflow 不承载业务 source of truth。
 
 ## CI/CD
 

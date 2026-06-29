@@ -14,6 +14,8 @@ docker compose -f infra/docker/docker-compose.yml --env-file infra/docker/.env.e
 - API health: http://127.0.0.1:8770/health
 - API 就绪检查: http://127.0.0.1:8770/ready
 - Web: http://127.0.0.1:5180
+- n8n: http://127.0.0.1:5678
+- n8n health: http://127.0.0.1:5678/healthz
 - PostgreSQL: 127.0.0.1:5432
 - Redis: 127.0.0.1:6379
 - RabbitMQ: http://127.0.0.1:15672
@@ -35,6 +37,21 @@ docker compose -f infra/docker/docker-compose.yml --env-file infra/docker/.env.e
 - `RABBITMQ_URL`
 - `MINIO_*`
 - `NEXT_PUBLIC_API_BASE`
+- `TAVERN_API_BASE_INTERNAL`
+- `N8N_*`
+
+`N8N_ENCRYPTION_KEY` 在 `.env.example` 中只是本地开发占位值。保存真实 n8n credentials 前，请复制成本地 `.env` 并换成稳定私密值。
+
+## n8n workflow 导入
+
+1. 启动 compose stack 后打开 http://127.0.0.1:5678。
+2. 使用本地 basic auth 默认账号 `tavern / tavern-n8n-local`，或按 n8n 首次启动提示创建 owner。
+3. 在 n8n 中选择 Import from File。
+4. 导入 `workflows/n8n/tavern-product-to-streaming.workflow.json`。
+5. 执行 manual trigger，`Run Tavern MVP live plan` 节点会调用 `api:8770` 的 Tavern API。
+6. 回到 Tavern Web 的 `/workflow` 或 `/mvp` 页面查看 run 与产物。
+
+n8n 容器内访问 Tavern API 使用 `http://api:8770`；如果在 Docker 外独立运行 n8n，请把 workflow 里的 API base 改为 `http://127.0.0.1:8770`。
 
 ## 数据库初始化
 
