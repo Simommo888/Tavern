@@ -16,7 +16,7 @@ llm:
   windows_wsl_setup_acknowledged: true
 
 image:
-  # 图片 Agent 与视觉 Prompt 默认复用 OpenAI 配置。
+  # 文本/视觉 Prompt 默认复用 OpenAI 配置；Image Agent 真实出图走 OpenAI Images API。
   model_provider: OpenAI
   model: gpt-5.5
   review_model: gpt-5.5
@@ -26,12 +26,23 @@ image:
   wire_api: responses
   disable_response_storage: true
   network_access: enabled
+  generation_provider: openai_image
+  generation_model: gpt-image-1
+  generation_size: 1024x1536
+  fallback_provider: placeholder_image
 
 video:
-  # 视频 Agent 默认走即梦 AI；真实密钥请放 TAVERN_JIMENG_API_KEY 环境变量或本地 secrets 文件。
+  # Video Agent 默认走即梦 AI；真实密钥请放 TAVERN_JIMENG_API_KEY 或火山 AK/SK 环境变量。
   model_provider: JimengAI
   model: jimeng-video
+  base_url: https://visual.volcengineapi.com
+  req_key: jimeng_t2v_v30
+  submit_action: CVSync2AsyncSubmitTask
+  result_action: CVSync2AsyncGetResult
+  api_version: '2022-08-31'
   api_key_env: TAVERN_JIMENG_API_KEY
+  access_key_env: TAVERN_JIMENG_ACCESS_KEY
+  secret_key_env: TAVERN_JIMENG_SECRET_KEY
   network_access: enabled
   fallback_provider: placeholder_video
 

@@ -11,6 +11,7 @@ from apps.api.app.api.v1 import workbench as workbench_module
 from apps.api.app.agents.live_anchor_graph import LiveAnchorGraph
 from apps.api.app.application.live_room_service import LiveRoomService
 from apps.api.app.application.workbench_service import WorkbenchService
+from apps.api.app.infrastructure.media_generation import GeneratedMediaResult
 from apps.api.app.main import create_app
 
 
@@ -131,23 +132,24 @@ class WorkbenchApiTests(unittest.TestCase):
             workbench_module._service = WorkbenchService(Path(tmp))
             client = TestClient(create_app())
 
-            response = client.post("/api/v1/workflow/product-videos/run", json={
-                "brand_name": "龙八",
-                "duration_seconds": 45,
-                "product": {
-                    "product_name": "龙八礼盒",
-                    "sku": "LB-VIDEO-001",
-                    "price": 299,
-                    "original_price": 399,
-                    "aroma_type": "酱香",
-                    "selling_points": ["宴请送礼", "礼盒包装", "直播权益"],
-                    "scenes": ["商务宴请", "节日拜访"],
-                },
-                "brand_profile": {
-                    "positioning": "面向成年人礼赠和宴请场景的可信酒类品牌",
-                    "tone": "高级、可信、克制",
-                },
-            })
+            with patch.dict(os.environ, {"TAVERN_FORCE_PLACEHOLDER_MEDIA": "true"}, clear=False):
+                response = client.post("/api/v1/workflow/product-videos/run", json={
+                    "brand_name": "龙八",
+                    "duration_seconds": 45,
+                    "product": {
+                        "product_name": "龙八礼盒",
+                        "sku": "LB-VIDEO-001",
+                        "price": 299,
+                        "original_price": 399,
+                        "aroma_type": "酱香",
+                        "selling_points": ["宴请送礼", "礼盒包装", "直播权益"],
+                        "scenes": ["商务宴请", "节日拜访"],
+                    },
+                    "brand_profile": {
+                        "positioning": "面向成年人礼赠和宴请场景的可信酒类品牌",
+                        "tone": "高级、可信、克制",
+                    },
+                })
             self.assertEqual(response.status_code, 200)
             workflow = response.json()["workflow"]
             self.assertEqual(workflow["run"]["status"], "succeeded")
@@ -194,7 +196,8 @@ class WorkbenchApiTests(unittest.TestCase):
                 },
             }
 
-            created = client.post("/api/v1/workflow/product-videos/runs", json=payload)
+            with patch.dict(os.environ, {"TAVERN_FORCE_PLACEHOLDER_MEDIA": "true"}, clear=False):
+                created = client.post("/api/v1/workflow/product-videos/runs", json=payload)
             self.assertEqual(created.status_code, 200)
             workflow = created.json()["workflow"]
             run_id = workflow["run"]["workflow_run_id"]
@@ -202,10 +205,11 @@ class WorkbenchApiTests(unittest.TestCase):
             self.assertEqual(workflow["run"]["input_payload"]["request"]["api_key"], "***")
             self.assertEqual([node["status"] for node in workflow["nodes"]], ["running"] + ["queued"] * 9)
 
-            for node_id in ["product_brand_input", "planner", "story", "script", "director", "visual_director", "asset", "image", "video", "editor"]:
-                result = client.post(f"/api/v1/workflow/product-videos/runs/{run_id}/nodes/{node_id}/run", json={})
-                self.assertEqual(result.status_code, 200)
-                workflow = result.json()["workflow"]
+            with patch.dict(os.environ, {"TAVERN_FORCE_PLACEHOLDER_MEDIA": "true"}, clear=False):
+                for node_id in ["product_brand_input", "planner", "story", "script", "director", "visual_director", "asset", "image", "video", "editor"]:
+                    result = client.post(f"/api/v1/workflow/product-videos/runs/{run_id}/nodes/{node_id}/run", json={})
+                    self.assertEqual(result.status_code, 200)
+                    workflow = result.json()["workflow"]
 
             self.assertEqual(workflow["run"]["status"], "succeeded")
             self.assertEqual(workflow["run"]["progress"], 1)
@@ -217,6 +221,56 @@ class WorkbenchApiTests(unittest.TestCase):
             self.assertEqual(planner_node["input_payload"]["provider_config"]["api_key_env"], "OPENAI_API_KEY")
             self.assertEqual(video_node["input_payload"]["provider_config"]["provider"], "jimeng_ai")
             self.assertEqual(video_node["input_payload"]["provider_config"]["api_key_env"], "TAVERN_JIMENG_API_KEY")
+
+    def test_product_video_workflow_uses_real_media_generators_when_configured(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            workbench_module._service = WorkbenchService(Path(tmp))
+            client = TestClient(create_app())
+
+            def fake_image(**kwargs):
+                output_path = Path(kwargs["output_path"])
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+                output_path.write_bytes(b"png")
+                return GeneratedMediaResult(provider="openai_image", uri=output_path.resolve().as_uri(), model=kwargs["model"], metadata={"source": "test"})
+
+            def fake_video(**kwargs):
+                output_path = Path(kwargs["output_path"])
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+                output_path.write_bytes(b"mp4")
+                return GeneratedMediaResult(provider="jimeng_ai", uri=output_path.resolve().as_uri(), model=kwargs["model"], metadata={"task_id": "task-test", "result_status": "done"})
+
+            with patch.dict(os.environ, {"OPENAI_API_KEY": "openai-test", "TAVERN_JIMENG_API_KEY": "jimeng-test", "TAVERN_FORCE_PLACEHOLDER_MEDIA": "false"}, clear=False), \
+                 patch("apps.api.app.application.workbench_service.generate_openai_image", side_effect=fake_image) as image_mock, \
+                 patch("apps.api.app.application.workbench_service.generate_jimeng_video", side_effect=fake_video) as video_mock:
+                response = client.post("/api/v1/workflow/product-videos/run", json={"brand_name": "龙八", "product": {"product_name": "龙八礼盒", "sku": "LB-REAL-001", "price": 299}})
+
+            self.assertEqual(response.status_code, 200)
+            workflow = response.json()["workflow"]
+            image_node = next(node for node in workflow["nodes"] if node["node_id"] == "image")
+            video_node = next(node for node in workflow["nodes"] if node["node_id"] == "video")
+            self.assertEqual(image_node["output_payload"]["data"]["provider"], "openai_image")
+            self.assertEqual(video_node["output_payload"]["data"]["provider"], "jimeng_ai")
+            self.assertEqual(workflow["final_video"]["status"], "media_ready")
+            self.assertEqual(image_mock.call_count, 3)
+            self.assertEqual(video_mock.call_count, 5)
+
+    def test_product_video_workflow_falls_back_to_placeholders_without_media_keys(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            workbench_module._service = WorkbenchService(Path(tmp))
+            client = TestClient(create_app())
+
+            with patch.dict(os.environ, {"OPENAI_API_KEY": "", "TAVERN_JIMENG_API_KEY": "", "TAVERN_JIMENG_ACCESS_KEY": "", "TAVERN_JIMENG_SECRET_KEY": ""}, clear=False):
+                response = client.post("/api/v1/workflow/product-videos/run", json={"brand_name": "龙八", "product": {"product_name": "龙八礼盒", "sku": "LB-FALLBACK-001", "price": 299}})
+
+            self.assertEqual(response.status_code, 200)
+            workflow = response.json()["workflow"]
+            image_node = next(node for node in workflow["nodes"] if node["node_id"] == "image")
+            video_node = next(node for node in workflow["nodes"] if node["node_id"] == "video")
+            self.assertEqual(image_node["output_payload"]["data"]["provider"], "placeholder_image")
+            self.assertEqual(video_node["output_payload"]["data"]["provider"], "placeholder_video")
+            self.assertTrue(image_node["output_payload"]["data"]["errors"])
+            self.assertTrue(video_node["output_payload"]["data"]["errors"])
+            self.assertEqual(workflow["final_video"]["status"], "placeholder_ready")
 
     def test_phase_nine_mvp_api_runs_product_to_saved_live_plan(self):
         with tempfile.TemporaryDirectory() as tmp:

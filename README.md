@@ -60,6 +60,16 @@ uv --directory "D:\Tavern" run uvicorn apps.api.app.main:app --host 127.0.0.1 --
 npm --prefix "D:\Tavern\apps\web" run dev
 ```
 
+## 媒体生成 Provider
+
+Product/Brand-to-Complete-Video 工作流的 Image Agent / Video Agent 已接入真实媒体 provider：
+
+- Image Agent：配置 `OPENAI_API_KEY` 后调用 OpenAI Images API，默认 `TAVERN_OPENAI_IMAGE_MODEL=gpt-image-1`、`TAVERN_OPENAI_IMAGE_SIZE=1024x1536`。
+- Video Agent：配置 `TAVERN_JIMENG_API_KEY`（Bearer 代理）或 `TAVERN_JIMENG_ACCESS_KEY` + `TAVERN_JIMENG_SECRET_KEY`（火山 HMAC）后调用即梦视频 API，默认 `TAVERN_JIMENG_REQ_KEY=jimeng_t2v_v30`、`CVSync2AsyncSubmitTask` / `CVSync2AsyncGetResult`。
+- 未配置密钥或 provider 失败时，系统自动回退到 `placeholder_image` / `placeholder_video`，并在资产 metadata 中记录 `fallback_reason`。
+- 本地/CI 如需强制离线占位，可设置 `TAVERN_FORCE_PLACEHOLDER_MEDIA=true`。
+
+
 Phase 2 建立了目标顶层边界，不新增业务功能：
 
 ```text

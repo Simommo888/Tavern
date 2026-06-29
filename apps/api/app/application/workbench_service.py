@@ -41,6 +41,7 @@ from apps.api.app.domain.workbench.entities import (
     WorkflowRule,
     WorkflowRun,
 )
+from apps.api.app.infrastructure.media_generation import generate_jimeng_video, generate_openai_image
 from apps.api.app.infrastructure.repositories.file_workbench import JsonCollectionRepository
 from apps.api.app.plugins.registry import build_plugin_manager
 
@@ -610,9 +611,11 @@ class WorkbenchService:
                 "object_key": final_video_uri,
                 "preview_url": final_video_uri,
                 "tags": ["完整视频", "Editor Agent", "端到端工作流"],
-                "metadata": {"workflow_run_id": workflow_run.workflow_run_id, "product_id": product.product_id, "brand_name": brand_name, "placeholder": True, "provider_config": _product_video_provider_config("editor")},
+                "metadata": {"workflow_run_id": workflow_run.workflow_run_id, "product_id": product.product_id, "brand_name": brand_name, "provider_config": _product_video_provider_config("editor"), "upstream_clip_providers": [str(clip.get("provider") or "") for clip in video_outputs.get("clips", [])]},
             })
-            final_video = {"asset_id": final_video_asset.asset_id, "uri": final_video_uri, "duration_seconds": editor_manifest["timeline"]["duration_seconds"], "format": "mp4", "status": "placeholder_ready", "note": "本地无外部生成器密钥时输出可追踪的完整视频占位产物；接入 Image/Video provider 后替换为真实媒体文件。"}
+            clip_providers = {str(clip.get("provider") or "") for clip in video_outputs.get("clips", [])}
+            final_status = "media_ready" if clip_providers and "placeholder_video" not in clip_providers else "placeholder_ready"
+            final_video = {"asset_id": final_video_asset.asset_id, "uri": final_video_uri, "duration_seconds": editor_manifest["timeline"]["duration_seconds"], "format": "mp4", "status": final_status, "note": "真实 Image/Video provider 可用时使用生成媒体；无外部密钥或 provider 失败时回退为可追踪占位产物。"}
             data = {**editor_manifest, "final_video": final_video}
             return data, final_video_uri, final_video
         raise ValueError(f"Unsupported product video workflow node: {node_id}")
@@ -665,43 +668,113 @@ class WorkbenchService:
         image_dir = artifact_root / "images"
         image_dir.mkdir(parents=True, exist_ok=True)
         outputs = []
+        provider = "openai_image" if _openai_image_enabled() else "placeholder_image"
+        errors: list[dict[str, str]] = []
         for prompt in visual_blueprint.get("image_prompts", []):
             image_id = str(prompt.get("id") or f"image_{len(outputs) + 1}")
-            image_path = image_dir / f"{image_id}.placeholder.png"
-            image_path.write_text(f"Placeholder image for {product.product_name}\nPrompt: {prompt.get('prompt', '')}\n", encoding="utf-8")
-            uri = _artifact_uri(image_path)
+            prompt_text = str(prompt.get("prompt") or f"{product.product_name} live commerce image")
+            image_path = image_dir / f"{image_id}.png"
+            metadata: dict[str, Any] = {"workflow": "product_brand_to_complete_video", "product_id": product.product_id, "prompt": prompt, "provider": provider}
+            try:
+                if provider == "openai_image":
+                    generated = generate_openai_image(
+                        prompt=prompt_text,
+                        output_path=image_path,
+                        api_key=str(os.environ.get("OPENAI_API_KEY") or ""),
+                        model=str(os.environ.get("TAVERN_OPENAI_IMAGE_MODEL") or "gpt-image-1"),
+                        size=str(os.environ.get("TAVERN_OPENAI_IMAGE_SIZE") or _image_size_for_canvas(visual_blueprint)),
+                        base_url=str(os.environ.get("TAVERN_OPENAI_IMAGE_BASE_URL") or os.environ.get("TAVERN_OPENAI_BASE_URL") or ""),
+                        timeout_seconds=float(os.environ.get("TAVERN_MEDIA_TIMEOUT_SECONDS") or 300),
+                    )
+                    uri = generated.uri
+                    metadata.update(generated.metadata)
+                    metadata["model"] = generated.model
+                    tags = ["Image Agent", "OpenAI", "完整视频"]
+                else:
+                    raise RuntimeError("OPENAI_API_KEY is not configured")
+            except Exception as exc:
+                provider = "placeholder_image"
+                image_path = image_dir / f"{image_id}.placeholder.png"
+                image_path.write_text(f"Placeholder image for {product.product_name}\nPrompt: {prompt_text}\nReason: {exc}\n", encoding="utf-8")
+                uri = _artifact_uri(image_path)
+                metadata.update({"placeholder": True, "fallback_provider": "placeholder_image", "fallback_reason": str(exc)})
+                tags = ["Image Agent", "占位图", "完整视频"]
+                errors.append({"image_id": image_id, "error": str(exc)})
             asset = self.create_asset(project.project_id, {
                 "name": str(prompt.get("label") or image_id),
                 "asset_type": "image",
                 "object_key": uri,
                 "preview_url": uri,
-                "tags": ["Image Agent", "占位图", "完整视频"],
-                "metadata": {"workflow": "product_brand_to_complete_video", "product_id": product.product_id, "prompt": prompt, "placeholder": True},
+                "tags": tags,
+                "metadata": metadata,
             })
-            outputs.append({"image_id": image_id, "asset_id": asset.asset_id, "uri": uri, "prompt": prompt})
-        return {"provider": "placeholder_image", "assets": outputs, "status": "ready"}
+            outputs.append({"image_id": image_id, "asset_id": asset.asset_id, "uri": uri, "prompt": prompt, "provider": metadata.get("fallback_provider") or metadata.get("provider")})
+        return {"provider": provider, "assets": outputs, "status": "ready", "errors": errors}
 
     def _create_video_clip_assets(self, project: Project, product: ProductRecord, director_plan: dict[str, Any], visual_blueprint: dict[str, Any], artifact_root: Path) -> dict[str, Any]:
         video_dir = artifact_root / "clips"
         video_dir.mkdir(parents=True, exist_ok=True)
         clips = []
+        provider = "jimeng_ai" if _jimeng_video_enabled() else "placeholder_video"
+        errors: list[dict[str, str]] = []
         prompts_by_shot = {str(item.get("shot_id")): item for item in visual_blueprint.get("video_prompts", [])}
         for shot in director_plan.get("shots", []):
             shot_id = str(shot.get("shot_id") or f"shot_{len(clips) + 1}")
-            clip_path = video_dir / f"{shot_id}.placeholder.mp4"
             prompt = prompts_by_shot.get(shot_id, {})
-            clip_path.write_text(f"Placeholder clip for {product.product_name}\nShot: {shot}\nPrompt: {prompt.get('prompt', '')}\n", encoding="utf-8")
-            uri = _artifact_uri(clip_path)
+            prompt_text = str(prompt.get("prompt") or shot.get("visual") or f"{product.product_name} product video")
+            shot_duration_seconds = int(shot.get("duration_seconds") or 5)
+            duration_seconds = shot_duration_seconds
+            jimeng_duration_seconds = _jimeng_duration_seconds(shot_duration_seconds)
+            clip_path = video_dir / f"{shot_id}.mp4"
+            metadata: dict[str, Any] = {"workflow": "product_brand_to_complete_video", "product_id": product.product_id, "shot": shot, "prompt": prompt, "provider": provider}
+            try:
+                if provider == "jimeng_ai":
+                    generated = generate_jimeng_video(
+                        prompt=prompt_text,
+                        output_path=clip_path,
+                        api_key=str(os.environ.get("TAVERN_JIMENG_API_KEY") or ""),
+                        base_url=str(os.environ.get("TAVERN_JIMENG_BASE_URL") or "https://visual.volcengineapi.com"),
+                        model=str(os.environ.get("TAVERN_JIMENG_VIDEO_MODEL") or "jimeng-video"),
+                        req_key=str(os.environ.get("TAVERN_JIMENG_REQ_KEY") or "jimeng_t2v_v30"),
+                        submit_action=str(os.environ.get("TAVERN_JIMENG_SUBMIT_ACTION") or "CVSync2AsyncSubmitTask"),
+                        result_action=str(os.environ.get("TAVERN_JIMENG_RESULT_ACTION") or "CVSync2AsyncGetResult"),
+                        api_version=str(os.environ.get("TAVERN_JIMENG_API_VERSION") or "2022-08-31"),
+                        aspect_ratio=_jimeng_aspect_ratio(visual_blueprint),
+                        duration_seconds=jimeng_duration_seconds,
+                        fps=int(os.environ.get("TAVERN_JIMENG_FPS") or 24),
+                        timeout_seconds=float(os.environ.get("TAVERN_MEDIA_TIMEOUT_SECONDS") or 300),
+                        poll_interval_seconds=float(os.environ.get("TAVERN_JIMENG_POLL_INTERVAL_SECONDS") or 2),
+                        max_poll_attempts=int(os.environ.get("TAVERN_JIMENG_MAX_POLL_ATTEMPTS") or 300),
+                        access_key=str(os.environ.get("TAVERN_JIMENG_ACCESS_KEY") or ""),
+                        secret_key=str(os.environ.get("TAVERN_JIMENG_SECRET_KEY") or ""),
+                        region=str(os.environ.get("TAVERN_JIMENG_REGION") or "cn-north-1"),
+                        service=str(os.environ.get("TAVERN_JIMENG_SERVICE") or "cv"),
+                    )
+                    uri = generated.uri
+                    metadata.update(generated.metadata)
+                    metadata["model"] = generated.model
+                    metadata["requested_duration_seconds"] = jimeng_duration_seconds
+                    tags = ["Video Agent", "即梦", "镜头视频", "完整视频"]
+                else:
+                    raise RuntimeError("TAVERN_JIMENG_API_KEY or TAVERN_JIMENG_ACCESS_KEY/TAVERN_JIMENG_SECRET_KEY is not configured")
+            except Exception as exc:
+                provider = "placeholder_video"
+                clip_path = video_dir / f"{shot_id}.placeholder.mp4"
+                clip_path.write_text(f"Placeholder clip for {product.product_name}\nShot: {shot}\nPrompt: {prompt_text}\nReason: {exc}\n", encoding="utf-8")
+                uri = _artifact_uri(clip_path)
+                metadata.update({"placeholder": True, "fallback_provider": "placeholder_video", "fallback_reason": str(exc), "requested_duration_seconds": jimeng_duration_seconds})
+                tags = ["Video Agent", "镜头视频", "完整视频", "占位视频"]
+                errors.append({"shot_id": shot_id, "error": str(exc)})
             asset = self.create_asset(project.project_id, {
                 "name": f"{product.product_name} {shot_id} 镜头视频",
                 "asset_type": "video",
                 "object_key": uri,
                 "preview_url": uri,
-                "tags": ["Video Agent", "镜头视频", "完整视频"],
-                "metadata": {"workflow": "product_brand_to_complete_video", "product_id": product.product_id, "shot": shot, "prompt": prompt, "placeholder": True},
+                "tags": tags,
+                "metadata": metadata,
             })
-            clips.append({"shot_id": shot_id, "asset_id": asset.asset_id, "uri": uri, "duration_seconds": shot.get("duration_seconds", 6), "prompt": prompt})
-        return {"provider": "placeholder_video", "clips": clips, "status": "ready"}
+            clips.append({"shot_id": shot_id, "asset_id": asset.asset_id, "uri": uri, "duration_seconds": duration_seconds, "prompt": prompt, "provider": metadata.get("fallback_provider") or metadata.get("provider")})
+        return {"provider": provider, "clips": clips, "status": "ready", "errors": errors}
 
     def _write_product_video_node_runs(self, workflow_run: WorkflowRun, workflow_def: WorkflowDefinition, stage_payloads: dict[str, Any], artifacts: dict[str, str], prompt_version_id: str) -> list[WorkflowNodeRun]:
         saved_nodes: list[WorkflowNodeRun] = []
@@ -1633,12 +1706,30 @@ def _product_video_provider_config(node_id: str) -> dict[str, Any]:
         "network_access": os.environ.get("TAVERN_NETWORK_ACCESS", "enabled"),
         "windows_wsl_setup_acknowledged": _env_bool("TAVERN_WINDOWS_WSL_SETUP_ACKNOWLEDGED", True),
     }
+    if node_id == "image":
+        return {
+            "provider": "openai_image",
+            "model_provider": "OpenAI",
+            "model": os.environ.get("TAVERN_OPENAI_IMAGE_MODEL", "gpt-image-1"),
+            "size": os.environ.get("TAVERN_OPENAI_IMAGE_SIZE", "1024x1536"),
+            "base_url": os.environ.get("TAVERN_OPENAI_IMAGE_BASE_URL") or os.environ.get("TAVERN_OPENAI_BASE_URL", "https://mirror.xinshu.ai"),
+            "api_key_env": "OPENAI_API_KEY",
+            "fallback_provider": "placeholder_image",
+            "network_access": os.environ.get("TAVERN_NETWORK_ACCESS", "enabled"),
+        }
     if node_id == "video":
         return {
             "provider": "jimeng_ai",
             "model_provider": "JimengAI",
             "model": os.environ.get("TAVERN_JIMENG_VIDEO_MODEL", "jimeng-video"),
+            "base_url": os.environ.get("TAVERN_JIMENG_BASE_URL", "https://visual.volcengineapi.com"),
+            "req_key": os.environ.get("TAVERN_JIMENG_REQ_KEY", "jimeng_t2v_v30"),
+            "submit_action": os.environ.get("TAVERN_JIMENG_SUBMIT_ACTION", "CVSync2AsyncSubmitTask"),
+            "result_action": os.environ.get("TAVERN_JIMENG_RESULT_ACTION", "CVSync2AsyncGetResult"),
+            "api_version": os.environ.get("TAVERN_JIMENG_API_VERSION", "2022-08-31"),
             "api_key_env": "TAVERN_JIMENG_API_KEY",
+            "access_key_env": "TAVERN_JIMENG_ACCESS_KEY",
+            "secret_key_env": "TAVERN_JIMENG_SECRET_KEY",
             "network_access": os.environ.get("TAVERN_NETWORK_ACCESS", "enabled"),
             "fallback_provider": "placeholder_video",
         }
@@ -1658,6 +1749,38 @@ def _env_bool(name: str, default: bool = False) -> bool:
     if value is None:
         return default
     return value.strip().lower() in {"1", "true", "yes", "on", "enabled"}
+
+
+def _openai_image_enabled() -> bool:
+    return bool(os.environ.get("OPENAI_API_KEY")) and not _env_bool("TAVERN_FORCE_PLACEHOLDER_MEDIA", False)
+
+
+def _jimeng_video_enabled() -> bool:
+    has_bearer = bool(os.environ.get("TAVERN_JIMENG_API_KEY"))
+    has_volc_keys = bool(os.environ.get("TAVERN_JIMENG_ACCESS_KEY") and os.environ.get("TAVERN_JIMENG_SECRET_KEY"))
+    return (has_bearer or has_volc_keys) and not _env_bool("TAVERN_FORCE_PLACEHOLDER_MEDIA", False)
+
+
+def _image_size_for_canvas(visual_blueprint: dict[str, Any]) -> str:
+    canvas = str(visual_blueprint.get("layout", {}).get("canvas") or "")
+    if canvas in {"1024x1024", "1024x1536", "1536x1024"}:
+        return canvas
+    return "1024x1536"
+
+
+def _jimeng_aspect_ratio(visual_blueprint: dict[str, Any]) -> str:
+    canvas = str(visual_blueprint.get("layout", {}).get("canvas") or "1080x1920")
+    if canvas in {"1080x1920", "720x1280", "1024x1536"}:
+        return "9:16"
+    if canvas in {"1920x1080", "1280x720", "1536x1024"}:
+        return "16:9"
+    return "9:16" if "9:16" in str(visual_blueprint.get("layout", {}).get("safe_area") or "9:16") else "16:9"
+
+
+def _jimeng_duration_seconds(duration_seconds: int) -> int:
+    allowed = [int(item.strip()) for item in str(os.environ.get("TAVERN_JIMENG_ALLOWED_DURATIONS") or "5,10").split(",") if item.strip().isdigit()]
+    allowed = sorted(set(allowed or [5, 10]))
+    return min(allowed, key=lambda item: abs(item - max(1, duration_seconds)))
 
 
 def _product_video_workflow_nodes() -> list[dict[str, Any]]:
