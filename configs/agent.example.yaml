@@ -2,23 +2,38 @@
 # 不要把真实密钥提交到仓库。共享环境或 CI 场景优先使用环境变量。
 
 llm:
-  # 支持的 providers：openai、claude、gemini。
-  # Claude 使用官方 Anthropic SDK；OpenAI 支持兼容中转；Gemini 使用 google-genai。
-  model_provider: openai
-  model: <YOUR_LLM_MODEL>
-  base_url: <YOUR_LLM_BASE_URL>
-  api_key: ''
-  wire_api: chat_completions
+  # 文本 Agent 默认走 OpenAI 兼容 Responses API 中转。
+  # 真实密钥请放 OPENAI_API_KEY 环境变量或 configs/agent.secrets.local.yaml，不要提交。
+  model_provider: OpenAI
+  model: gpt-5.5
+  review_model: gpt-5.5
+  model_reasoning_effort: xhigh
+  base_url: https://mirror.xinshu.ai
+  api_key_env: OPENAI_API_KEY
+  wire_api: responses
+  disable_response_storage: true
+  network_access: enabled
+  windows_wsl_setup_acknowledged: true
 
 image:
-  model: <YOUR_IMAGE_MODEL>
-  base_url: <YOUR_IMAGE_BASE_URL>
-  api_key: ''
+  # 图片 Agent 与视觉 Prompt 默认复用 OpenAI 配置。
+  model_provider: OpenAI
+  model: gpt-5.5
+  review_model: gpt-5.5
+  model_reasoning_effort: xhigh
+  base_url: https://mirror.xinshu.ai
+  api_key_env: OPENAI_API_KEY
+  wire_api: responses
+  disable_response_storage: true
+  network_access: enabled
 
 video:
-  model: <YOUR_VIDEO_MODEL>
-  base_url: <YOUR_VIDEO_BASE_URL>
-  api_key: ''
+  # 视频 Agent 默认走即梦 AI；真实密钥请放 TAVERN_JIMENG_API_KEY 环境变量或本地 secrets 文件。
+  model_provider: JimengAI
+  model: jimeng-video
+  api_key_env: TAVERN_JIMENG_API_KEY
+  network_access: enabled
+  fallback_provider: placeholder_video
 
 # 可选。仅在使用 novel2video planning 时填写。
 embedding:

@@ -8,6 +8,7 @@ const navGroups = [
       ['Projects', '/projects'],
       ['Agents', '/agents'],
       ['Workflow', '/workflow'],
+      ['Complete Video', '/complete-video'],
       ['Phase 9 MVP', '/mvp'],
       ['Studio', '/studio'],
     ],

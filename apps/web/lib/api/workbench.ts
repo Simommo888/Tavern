@@ -1,5 +1,5 @@
 import { apiRequest } from '@/lib/api/config';
-import type { AgentProfile, AgentRun, AnalyticsOverview, Asset, AvatarProfile, BestPractice, DashboardSummary, KnowledgeChunk, KnowledgeDocument, LiveComponent, LiveRoomComposition, LiveScene, ModelProviderConfig, MvpLivePlan, PlatformEvent, PlatformMetricSnapshot, PluginProvider, ProductRecord, Project, PromptTemplate, PromptVersion, ScriptTemplate, WorkflowDefinition, WorkflowNodeRun, WorkflowRule, WorkflowRun } from '@/types/workbench';
+import type { AgentProfile, AgentRun, AnalyticsOverview, Asset, AvatarProfile, BestPractice, DashboardSummary, KnowledgeChunk, KnowledgeDocument, LiveComponent, LiveRoomComposition, LiveScene, ModelProviderConfig, MvpLivePlan, PlatformEvent, PlatformMetricSnapshot, PluginProvider, ProductRecord, ProductVideoWorkflowSnapshot, Project, PromptTemplate, PromptVersion, ScriptTemplate, WorkflowDefinition, WorkflowNodeRun, WorkflowRule, WorkflowRun, WorkflowStartPayload } from '@/types/workbench';
 
 export async function getDashboardSummary(): Promise<DashboardSummary> {
   return apiRequest<DashboardSummary>('/api/v1/dashboard/summary');
@@ -255,6 +255,35 @@ export async function listWorkflowRuns(projectId?: string): Promise<WorkflowRun[
 export async function listWorkflowNodeRuns(workflowRunId: string): Promise<WorkflowNodeRun[]> {
   const payload = await apiRequest<{ nodes: WorkflowNodeRun[] }>(`/api/v1/workflow/runs/${workflowRunId}/nodes`);
   return payload.nodes;
+}
+
+export async function createProductVideoWorkflowRun(payload: WorkflowStartPayload): Promise<ProductVideoWorkflowSnapshot> {
+  const response = await apiRequest<{ workflow: ProductVideoWorkflowSnapshot }>('/api/v1/workflow/product-videos/runs', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  return response.workflow;
+}
+
+export async function runProductVideoWorkflowNode(workflowRunId: string, nodeId: string): Promise<ProductVideoWorkflowSnapshot> {
+  const response = await apiRequest<{ workflow: ProductVideoWorkflowSnapshot }>(`/api/v1/workflow/product-videos/runs/${workflowRunId}/nodes/${nodeId}/run`, {
+    method: 'POST',
+    body: JSON.stringify({ source: 'web_console' }),
+  });
+  return response.workflow;
+}
+
+export async function runProductVideoWorkflow(payload: WorkflowStartPayload): Promise<ProductVideoWorkflowSnapshot> {
+  const response = await apiRequest<{ workflow: ProductVideoWorkflowSnapshot }>('/api/v1/workflow/product-videos/run', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  return response.workflow;
+}
+
+export async function getProductVideoWorkflowRun(workflowRunId: string): Promise<ProductVideoWorkflowSnapshot> {
+  const response = await apiRequest<{ workflow: ProductVideoWorkflowSnapshot }>(`/api/v1/workflow/product-videos/runs/${workflowRunId}`);
+  return response.workflow;
 }
 
 export async function listBestPractices(projectId?: string): Promise<BestPractice[]> {

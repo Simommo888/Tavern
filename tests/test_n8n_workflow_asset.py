@@ -22,7 +22,8 @@ EXPECTED_STAGES = [
 ]
 EXPECTED_API_PATHS = [
     "/api/v1/workflow/definitions",
-    "/api/v1/workflow/product-videos/run",
+    "/api/v1/workflow/product-videos/runs",
+    "/api/v1/workflow/product-videos/runs/{{$json.workflow.run.workflow_run_id}}/nodes/planner/run",
     "/api/v1/workflow/runs",
 ]
 
@@ -46,6 +47,8 @@ class N8nWorkflowAssetTests(unittest.TestCase):
         self.assertEqual(product_video.nodes[-1]["artifact"], "complete_video")
 
         serialized = json.dumps(workflow, ensure_ascii=False)
+        self.assertNotIn("/api/v1/workflow/product-videos/run\"", serialized)
+        self.assertIn("one_http_node_per_agent", serialized)
         for api_path in EXPECTED_API_PATHS:
             self.assertIn(api_path, serialized)
 

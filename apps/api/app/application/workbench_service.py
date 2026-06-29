@@ -327,123 +327,122 @@ class WorkbenchService:
         return saved
 
     def run_product_video_workflow(self, payload: dict[str, Any]) -> dict[str, Any]:
+        snapshot = self.create_product_video_workflow_run(payload)
+        workflow_run_id = str(snapshot["run"]["workflow_run_id"])
+        for node in snapshot["definition"]["nodes"]:
+            snapshot = self.run_product_video_workflow_node(workflow_run_id, str(node["id"]))
+        return snapshot
+
+    def create_product_video_workflow_run(self, payload: dict[str, Any]) -> dict[str, Any]:
         product = self._resolve_video_product(payload)
         project = self._resolve_video_project(payload, product)
         brand_name = _video_brand_name(payload, project, product)
         workflow_def = self._ensure_product_video_workflow_definition()
-        workflow_run = WorkflowRun(
+        workflow_run = self.workflow_runs.upsert(WorkflowRun(
             project_id=project.project_id,
             workflow_definition_id=workflow_def.workflow_definition_id,
             status="running",
             progress=0,
-            current_node_id="product_brand_input",
-            input_payload={"project_id": project.project_id, "product_id": product.product_id, "workflow": "product_brand_to_complete_video", "request": payload},
-            logs=["商品/品牌资料已进入端到端视频生产工作流"],
-        )
-        artifact_root = self.workspace_root / ".working_dir" / "workbench" / "video_workflows" / workflow_run.workflow_run_id
-        artifact_root.mkdir(parents=True, exist_ok=True)
-
-        product_brand = _video_product_brand_brief(product, project, brand_name, payload)
-        planner_plan = _video_planner_plan(product, brand_name, payload)
-        story = _video_story(product, brand_name, planner_plan)
-        script_text = _video_script(product, brand_name, story, payload)
-        script = self.create_script({
-            "name": f"完整视频直播话术-{product.product_name}",
-            "category": "sales",
-            "content": script_text,
-            "product_id": product.product_id,
-            "ai_generated": True,
-            "tags": ["完整视频", "直播话术", "端到端工作流"],
-        })
-        director_plan = _video_director_plan(product, story, script_text, payload)
-        visual_blueprint = _video_visual_blueprint(product, brand_name, director_plan, payload)
-        source_assets = self._select_video_source_assets(project, product, payload)
-        asset_manifest = _video_asset_manifest(product, project, source_assets, visual_blueprint)
-        image_outputs = self._create_video_image_assets(project, product, visual_blueprint, artifact_root)
-        video_outputs = self._create_video_clip_assets(project, product, director_plan, visual_blueprint, artifact_root)
-        editor_manifest = _video_editor_manifest(product, brand_name, script, director_plan, visual_blueprint, image_outputs, video_outputs, payload)
-        final_video_path = artifact_root / "final-video.placeholder.mp4"
-        final_video_path.write_text(_video_placeholder_content(product, brand_name, editor_manifest), encoding="utf-8")
-        final_video_uri = _artifact_uri(final_video_path)
-        final_video_asset = self.create_asset(project.project_id, {
-            "name": f"完整视频-{product.product_name}",
-            "asset_type": "video",
-            "object_key": final_video_uri,
-            "preview_url": final_video_uri,
-            "tags": ["完整视频", "Editor Agent", "端到端工作流"],
-            "metadata": {"workflow_run_id": workflow_run.workflow_run_id, "product_id": product.product_id, "brand_name": brand_name, "placeholder": True},
-        })
-        final_video = {
-            "asset_id": final_video_asset.asset_id,
-            "uri": final_video_uri,
-            "duration_seconds": editor_manifest["timeline"]["duration_seconds"],
-            "format": "mp4",
-            "status": "placeholder_ready",
-            "note": "本地无外部生成器密钥时输出可追踪的完整视频占位产物；接入 Image/Video provider 后替换为真实媒体文件。",
-        }
-        artifacts = {
-            "product_brand_input": _write_json_artifact(artifact_root, "00-product-brand-input.json", product_brand),
-            "planner": _write_json_artifact(artifact_root, "01-planner-plan.json", planner_plan),
-            "story": _write_json_artifact(artifact_root, "02-story.json", story),
-            "script": _write_json_artifact(artifact_root, "03-script.json", {"script_template_id": script.template_id, "content": script.content}),
-            "director": _write_json_artifact(artifact_root, "04-director-shot-plan.json", director_plan),
-            "visual_director": _write_json_artifact(artifact_root, "05-visual-blueprint.json", visual_blueprint),
-            "asset": _write_json_artifact(artifact_root, "06-asset-manifest.json", asset_manifest),
-            "image": _write_json_artifact(artifact_root, "07-image-assets.json", image_outputs),
-            "video": _write_json_artifact(artifact_root, "08-video-clips.json", video_outputs),
-            "editor": _write_json_artifact(artifact_root, "09-editor-final-video.json", {**editor_manifest, "final_video": final_video}),
-            "complete_video": final_video_uri,
-            "final_video": final_video_uri,
-        }
-        stage_payloads = {
-            "product_brand_input": product_brand,
-            "planner": planner_plan,
-            "story": story,
-            "script": {"script_template_id": script.template_id, "content": script.content, "category": script.category},
-            "director": director_plan,
-            "visual_director": visual_blueprint,
-            "asset": asset_manifest,
-            "image": image_outputs,
-            "video": video_outputs,
-            "editor": {**editor_manifest, "final_video": final_video},
-        }
-        nodes = self._write_product_video_node_runs(workflow_run, workflow_def, stage_payloads, artifacts, script.template_id)
-        self._write_product_video_agent_runs(project, workflow_run, workflow_def, nodes)
-        workflow_run = self.workflow_runs.upsert(workflow_run.model_copy(update={
-            "status": "succeeded",
-            "progress": 1,
-            "current_node_id": "editor",
-            "output_payload": {
+            current_node_id=str(workflow_def.nodes[0]["id"]),
+            input_payload={
+                "project_id": project.project_id,
                 "product_id": product.product_id,
                 "brand_name": brand_name,
-                "script_template_id": script.template_id,
-                "final_video": final_video,
-                "artifacts": artifacts,
+                "workflow": "product_brand_to_complete_video",
+                "request": _sanitize_workflow_payload(payload),
             },
-            "logs": [
-                "Planner/Story/Script/Director/Visual Director 已完成创意生产",
-                "Asset/Image/Video 已生成离线可追踪素材清单与占位产物",
-                "Editor Agent 已输出完整视频产物并登记到资产中心",
-            ],
-            "token_count": 8600,
-            "cost_estimate": 0,
-            "duration_seconds": float(editor_manifest["timeline"]["duration_seconds"]),
+            logs=["商品/品牌资料已进入端到端视频生产工作流", "等待 n8n 或 Tavern 控制台逐节点执行"],
+        ))
+        self._product_video_artifact_root(workflow_run.workflow_run_id).mkdir(parents=True, exist_ok=True)
+        self._ensure_product_video_node_placeholders(workflow_run, workflow_def)
+        return self.get_product_video_workflow_snapshot(workflow_run.workflow_run_id)
+
+    def run_product_video_workflow_node(self, workflow_run_id: str, node_id: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        payload = payload or {}
+        workflow_run = self.workflow_runs.get(workflow_run_id)
+        workflow_def = self._product_video_definition_for_run(workflow_run)
+        node_ids = [str(node["id"]) for node in workflow_def.nodes]
+        if node_id not in node_ids:
+            raise ValueError(f"Unknown product video workflow node: {node_id}")
+        self._ensure_product_video_node_placeholders(workflow_run, workflow_def)
+        node_index = node_ids.index(node_id)
+        product = self.products.get(str(workflow_run.input_payload.get("product_id") or ""))
+        project = self.projects.get(str(workflow_run.input_payload.get("project_id") or ""))
+        request = dict(workflow_run.input_payload.get("request") or {})
+        request.update(_sanitize_workflow_payload(payload))
+        brand_name = str(workflow_run.input_payload.get("brand_name") or _video_brand_name(request, project, product))
+        artifact_root = self._product_video_artifact_root(workflow_run.workflow_run_id)
+        artifact_root.mkdir(parents=True, exist_ok=True)
+
+        data, artifact_uri, final_video = self._execute_product_video_stage(node_id, workflow_run, workflow_def, product, project, brand_name, request, artifact_root)
+        node_def = workflow_def.nodes[node_index]
+        existing_node_run = self._get_product_video_node_run(workflow_run.workflow_run_id, node_id)
+        node_run = WorkflowNodeRun(
+            workflow_run_id=workflow_run.workflow_run_id,
+            node_id=node_id,
+            name=str(node_def.get("label")),
+            agent_id=str(node_def.get("agent")),
+            status="succeeded",
+            input_payload={
+                "upstream": workflow_def.nodes[node_index - 1]["id"] if node_index else "operator",
+                "workflow": "product_brand_to_complete_video",
+                "provider_config": _product_video_provider_config(node_id),
+            },
+            output_payload={"artifact": node_def.get("artifact", ""), "artifact_uri": artifact_uri, "data": data},
+            prompt_version_id=str(data.get("script_template_id") or "") if node_id == "script" else "",
+            logs=[f"{node_def.get('label')} 已完成", f"产物：{node_def.get('artifact', '')}", f"Provider：{_product_video_provider_config(node_id)['provider']}"],
+            token_count=int(data.get("token_count") or (900 if node_def.get("reusable", True) else 300)),
+            duration_seconds=float(data.get("duration_seconds") or (8 + node_index * 2)),
+            completed_at=utc_now_iso(),
+        )
+        if existing_node_run:
+            node_run = node_run.model_copy(update={"node_run_id": existing_node_run.node_run_id, "started_at": existing_node_run.started_at})
+        node_run = self.workflow_node_runs.upsert(node_run)
+        self._write_product_video_agent_run(project, workflow_run, node_def, node_run)
+
+        completed_count = len([node for node in self._product_video_node_runs(workflow_run.workflow_run_id, workflow_def) if node.status == "succeeded"])
+        is_done = completed_count >= len(workflow_def.nodes)
+        next_node_id = node_ids[min(node_index + 1, len(node_ids) - 1)]
+        output_payload = dict(workflow_run.output_payload)
+        artifacts = dict(output_payload.get("artifacts") or {})
+        artifacts[node_id] = artifact_uri
+        output_payload.update({"product_id": product.product_id, "brand_name": brand_name, "artifacts": artifacts})
+        if final_video:
+            output_payload["final_video"] = final_video
+            artifacts["complete_video"] = str(final_video.get("uri") or "")
+            artifacts["final_video"] = str(final_video.get("uri") or "")
+        workflow_run = self.workflow_runs.upsert(workflow_run.model_copy(update={
+            "status": "succeeded" if is_done else "running",
+            "progress": round(completed_count / len(workflow_def.nodes), 4),
+            "current_node_id": node_id if is_done else next_node_id,
+            "output_payload": output_payload,
+            "logs": [*workflow_run.logs, f"{node_def.get('label')} 已输出 {node_def.get('artifact', '')}"][-12:],
+            "token_count": workflow_run.token_count + node_run.token_count,
+            "duration_seconds": workflow_run.duration_seconds + node_run.duration_seconds,
             "updated_at": utc_now_iso(),
         }))
-        metadata = dict(project.metadata)
-        metadata["latest_product_video_workflow_run_id"] = workflow_run.workflow_run_id
-        metadata["latest_complete_video_uri"] = final_video_uri
-        metadata["product_ids"] = _unique_strings([*metadata.get("product_ids", []), product.product_id])
-        self.projects.upsert(project.model_copy(update={"metadata": metadata, "updated_at": utc_now_iso()}))
-        logger.info("Product-to-complete-video workflow succeeded", extra={"workflow_run_id": workflow_run.workflow_run_id, "project_id": project.project_id, "product_id": product.product_id})
+        if final_video:
+            metadata = dict(project.metadata)
+            metadata["latest_product_video_workflow_run_id"] = workflow_run.workflow_run_id
+            metadata["latest_complete_video_uri"] = str(final_video.get("uri") or "")
+            metadata["product_ids"] = _unique_strings([*metadata.get("product_ids", []), product.product_id])
+            self.projects.upsert(project.model_copy(update={"metadata": metadata, "updated_at": utc_now_iso()}))
+        return self.get_product_video_workflow_snapshot(workflow_run.workflow_run_id)
+
+    def get_product_video_workflow_snapshot(self, workflow_run_id: str) -> dict[str, Any]:
+        workflow_run = self.workflow_runs.get(workflow_run_id)
+        workflow_def = self._product_video_definition_for_run(workflow_run)
+        nodes = self._product_video_node_runs(workflow_run.workflow_run_id, workflow_def)
+        product = self.products.get(str(workflow_run.input_payload.get("product_id") or ""))
+        project = self.projects.get(str(workflow_run.input_payload.get("project_id") or ""))
         return {
             "definition": workflow_def.model_dump(),
             "run": workflow_run.model_dump(),
             "nodes": [node.model_dump() for node in nodes],
             "project": project.model_dump(),
             "product": product.model_dump(),
-            "final_video": final_video,
-            "artifacts": artifacts,
+            "final_video": workflow_run.output_payload.get("final_video", {}),
+            "artifacts": workflow_run.output_payload.get("artifacts", {}),
         }
 
     def _resolve_video_product(self, payload: dict[str, Any]) -> ProductRecord:
@@ -505,6 +504,135 @@ class WorkbenchService:
             if definition.version == "product-video-v1":
                 return self.workflow_definitions.upsert(definition.model_copy(update=payload))
         return self.workflow_definitions.upsert(WorkflowDefinition(**payload))
+
+    def _product_video_definition_for_run(self, workflow_run: WorkflowRun) -> WorkflowDefinition:
+        if workflow_run.workflow_definition_id:
+            try:
+                return self.workflow_definitions.get(workflow_run.workflow_definition_id)
+            except KeyError:
+                pass
+        return self._ensure_product_video_workflow_definition()
+
+    def _product_video_artifact_root(self, workflow_run_id: str) -> Path:
+        return self.workspace_root / ".working_dir" / "workbench" / "video_workflows" / workflow_run_id
+
+    def _product_video_node_runs(self, workflow_run_id: str, workflow_def: WorkflowDefinition) -> list[WorkflowNodeRun]:
+        node_order = {str(node["id"]): index for index, node in enumerate(workflow_def.nodes)}
+        nodes = [node for node in self.workflow_node_runs.list() if node.workflow_run_id == workflow_run_id and node.node_id in node_order]
+        return sorted(nodes, key=lambda node: node_order.get(node.node_id, 999))
+
+    def _get_product_video_node_run(self, workflow_run_id: str, node_id: str) -> WorkflowNodeRun | None:
+        for node in self.workflow_node_runs.list():
+            if node.workflow_run_id == workflow_run_id and node.node_id == node_id:
+                return node
+        return None
+
+    def _ensure_product_video_node_placeholders(self, workflow_run: WorkflowRun, workflow_def: WorkflowDefinition) -> None:
+        existing_node_ids = {node.node_id for node in self._product_video_node_runs(workflow_run.workflow_run_id, workflow_def)}
+        for index, node in enumerate(workflow_def.nodes):
+            node_id = str(node["id"])
+            if node_id in existing_node_ids:
+                continue
+            self.workflow_node_runs.upsert(WorkflowNodeRun(
+                workflow_run_id=workflow_run.workflow_run_id,
+                node_id=node_id,
+                name=str(node.get("label")),
+                agent_id=str(node.get("agent")),
+                status="queued" if index else "running",
+                input_payload={"upstream": workflow_def.nodes[index - 1]["id"] if index else "operator", "provider_config": _product_video_provider_config(node_id)},
+                output_payload={"artifact": node.get("artifact", ""), "artifact_uri": "", "data": {}},
+                logs=["等待上游节点完成" if index else "等待商品/品牌资料结构化"],
+            ))
+
+    def _execute_product_video_stage(self, node_id: str, workflow_run: WorkflowRun, workflow_def: WorkflowDefinition, product: ProductRecord, project: Project, brand_name: str, request: dict[str, Any], artifact_root: Path) -> tuple[dict[str, Any], str, dict[str, Any] | None]:
+        upstream = {node.node_id: node.output_payload.get("data", {}) for node in self._product_video_node_runs(workflow_run.workflow_run_id, workflow_def) if node.status == "succeeded"}
+        if node_id == "product_brand_input":
+            data = _video_product_brand_brief(product, project, brand_name, request)
+            return data, _write_json_artifact(artifact_root, "00-product-brand-input.json", data), None
+        if node_id == "planner":
+            data = _video_planner_plan(product, brand_name, request)
+            return data, _write_json_artifact(artifact_root, "01-planner-plan.json", data), None
+        if node_id == "story":
+            planner_plan = dict(upstream.get("planner") or _video_planner_plan(product, brand_name, request))
+            data = _video_story(product, brand_name, planner_plan)
+            return data, _write_json_artifact(artifact_root, "02-story.json", data), None
+        if node_id == "script":
+            story = dict(upstream.get("story") or _video_story(product, brand_name, _video_planner_plan(product, brand_name, request)))
+            script_text = _video_script(product, brand_name, story, request)
+            script = self.create_script({
+                "name": f"完整视频直播话术-{product.product_name}",
+                "category": "sales",
+                "content": script_text,
+                "product_id": product.product_id,
+                "ai_generated": True,
+                "tags": ["完整视频", "直播话术", "端到端工作流"],
+            })
+            data = {"script_template_id": script.template_id, "content": script.content, "category": script.category}
+            return data, _write_json_artifact(artifact_root, "03-script.json", data), None
+        if node_id == "director":
+            story = dict(upstream.get("story") or _video_story(product, brand_name, _video_planner_plan(product, brand_name, request)))
+            script_data = dict(upstream.get("script") or {})
+            script_text = str(script_data.get("content") or _video_script(product, brand_name, story, request))
+            data = _video_director_plan(product, story, script_text, request)
+            return data, _write_json_artifact(artifact_root, "04-director-shot-plan.json", data), None
+        if node_id == "visual_director":
+            director_plan = dict(upstream.get("director") or _video_director_plan(product, dict(upstream.get("story") or {}), str(dict(upstream.get("script") or {}).get("content") or ""), request))
+            data = _video_visual_blueprint(product, brand_name, director_plan, request)
+            return data, _write_json_artifact(artifact_root, "05-visual-blueprint.json", data), None
+        if node_id == "asset":
+            visual_blueprint = dict(upstream.get("visual_director") or {})
+            source_assets = self._select_video_source_assets(project, product, request)
+            data = _video_asset_manifest(product, project, source_assets, visual_blueprint)
+            return data, _write_json_artifact(artifact_root, "06-asset-manifest.json", data), None
+        if node_id == "image":
+            visual_blueprint = dict(upstream.get("visual_director") or _video_visual_blueprint(product, brand_name, dict(upstream.get("director") or {}), request))
+            data = self._create_video_image_assets(project, product, visual_blueprint, artifact_root)
+            return data, _write_json_artifact(artifact_root, "07-image-assets.json", data), None
+        if node_id == "video":
+            director_plan = dict(upstream.get("director") or {})
+            visual_blueprint = dict(upstream.get("visual_director") or {})
+            data = self._create_video_clip_assets(project, product, director_plan, visual_blueprint, artifact_root)
+            return data, _write_json_artifact(artifact_root, "08-video-clips.json", data), None
+        if node_id == "editor":
+            script_data = dict(upstream.get("script") or {})
+            script = self.scripts.get(str(script_data.get("script_template_id") or "")) if script_data.get("script_template_id") else self.create_script({"name": f"完整视频直播话术-{product.product_name}", "category": "sales", "content": _video_script(product, brand_name, dict(upstream.get("story") or {}), request), "product_id": product.product_id, "ai_generated": True, "tags": ["完整视频", "直播话术", "端到端工作流"]})
+            director_plan = dict(upstream.get("director") or {})
+            visual_blueprint = dict(upstream.get("visual_director") or {})
+            image_outputs = dict(upstream.get("image") or {"assets": []})
+            video_outputs = dict(upstream.get("video") or {"clips": []})
+            editor_manifest = _video_editor_manifest(product, brand_name, script, director_plan, visual_blueprint, image_outputs, video_outputs, request)
+            final_video_path = artifact_root / "final-video.placeholder.mp4"
+            final_video_path.write_text(_video_placeholder_content(product, brand_name, editor_manifest), encoding="utf-8")
+            final_video_uri = _artifact_uri(final_video_path)
+            final_video_asset = self.create_asset(project.project_id, {
+                "name": f"完整视频-{product.product_name}",
+                "asset_type": "video",
+                "object_key": final_video_uri,
+                "preview_url": final_video_uri,
+                "tags": ["完整视频", "Editor Agent", "端到端工作流"],
+                "metadata": {"workflow_run_id": workflow_run.workflow_run_id, "product_id": product.product_id, "brand_name": brand_name, "placeholder": True, "provider_config": _product_video_provider_config("editor")},
+            })
+            final_video = {"asset_id": final_video_asset.asset_id, "uri": final_video_uri, "duration_seconds": editor_manifest["timeline"]["duration_seconds"], "format": "mp4", "status": "placeholder_ready", "note": "本地无外部生成器密钥时输出可追踪的完整视频占位产物；接入 Image/Video provider 后替换为真实媒体文件。"}
+            data = {**editor_manifest, "final_video": final_video}
+            return data, final_video_uri, final_video
+        raise ValueError(f"Unsupported product video workflow node: {node_id}")
+
+    def _write_product_video_agent_run(self, project: Project, workflow_run: WorkflowRun, node: dict[str, Any], node_run: WorkflowNodeRun) -> None:
+        self.agent_runs.upsert(AgentRun(
+            project_id=project.project_id,
+            agent_id=str(node.get("agent")),
+            workflow_run_id=workflow_run.workflow_run_id,
+            node_run_id=node_run.node_run_id,
+            task=str(node.get("description") or node.get("label") or ""),
+            status="succeeded",
+            progress=1,
+            input_payload=node_run.input_payload,
+            output_payload=node_run.output_payload,
+            logs=node_run.logs,
+            token_count=node_run.token_count,
+            duration_seconds=node_run.duration_seconds,
+            completed_at=utc_now_iso(),
+        ))
 
     def _select_video_source_assets(self, project: Project, product: ProductRecord, payload: dict[str, Any]) -> list[dict[str, Any]]:
         provided_assets = payload.get("assets") if isinstance(payload.get("assets"), list) else []
@@ -1473,6 +1601,65 @@ def _mvp_steps(product: ProductRecord, brand_analysis: dict[str, Any], script: S
     ]
 
 
+def _sanitize_workflow_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    forbidden = {"api_key", "openai_api_key", "jimeng_api_key", "secret", "secret_key", "access_token", "authorization", "bearer"}
+    sanitized: dict[str, Any] = {}
+    for key, value in payload.items():
+        lowered = key.lower()
+        if lowered in forbidden or any(fragment in lowered for fragment in ["api_key", "secret", "token", "authorization"]):
+            sanitized[key] = "***"
+            continue
+        if isinstance(value, dict):
+            sanitized[key] = _sanitize_workflow_payload(value)
+        elif isinstance(value, list):
+            sanitized[key] = [_sanitize_workflow_payload(item) if isinstance(item, dict) else item for item in value]
+        else:
+            sanitized[key] = value
+    return sanitized
+
+
+def _product_video_provider_config(node_id: str) -> dict[str, Any]:
+    text_image_config = {
+        "provider": os.environ.get("TAVERN_TEXT_IMAGE_MODEL_PROVIDER", "OpenAI"),
+        "model_provider": os.environ.get("TAVERN_TEXT_IMAGE_MODEL_PROVIDER", "OpenAI"),
+        "model": os.environ.get("TAVERN_TEXT_IMAGE_MODEL", "gpt-5.5"),
+        "review_model": os.environ.get("TAVERN_TEXT_IMAGE_REVIEW_MODEL", "gpt-5.5"),
+        "model_reasoning_effort": os.environ.get("TAVERN_TEXT_IMAGE_REASONING_EFFORT", "xhigh"),
+        "base_url": os.environ.get("TAVERN_OPENAI_BASE_URL", "https://mirror.xinshu.ai"),
+        "wire_api": os.environ.get("TAVERN_OPENAI_WIRE_API", "responses"),
+        "requires_openai_auth": True,
+        "api_key_env": "OPENAI_API_KEY",
+        "disable_response_storage": _env_bool("TAVERN_DISABLE_RESPONSE_STORAGE", True),
+        "network_access": os.environ.get("TAVERN_NETWORK_ACCESS", "enabled"),
+        "windows_wsl_setup_acknowledged": _env_bool("TAVERN_WINDOWS_WSL_SETUP_ACKNOWLEDGED", True),
+    }
+    if node_id == "video":
+        return {
+            "provider": "jimeng_ai",
+            "model_provider": "JimengAI",
+            "model": os.environ.get("TAVERN_JIMENG_VIDEO_MODEL", "jimeng-video"),
+            "api_key_env": "TAVERN_JIMENG_API_KEY",
+            "network_access": os.environ.get("TAVERN_NETWORK_ACCESS", "enabled"),
+            "fallback_provider": "placeholder_video",
+        }
+    if node_id == "editor":
+        return {
+            "provider": "ffmpeg_moviepy",
+            "model_provider": "local_editor",
+            "upstream_video_provider": "jimeng_ai",
+            "api_key_env": "TAVERN_JIMENG_API_KEY",
+            "fallback_provider": "placeholder_editor",
+        }
+    return text_image_config
+
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on", "enabled"}
+
+
 def _product_video_workflow_nodes() -> list[dict[str, Any]]:
     return [
         {"id": "product_brand_input", "label": "商品/品牌资料", "agent": "Product Agent", "stage": "Input", "artifact": "product_brand_brief", "description": "结构化商品、品牌、卖点、素材与合规边界", "reusable": True},
@@ -1558,14 +1745,21 @@ def _video_script(product: ProductRecord, brand_name: str, story: dict[str, Any]
 def _video_director_plan(product: ProductRecord, story: dict[str, Any], script_text: str, payload: dict[str, Any]) -> dict[str, Any]:
     target_duration = int(payload.get("duration_seconds") or story.get("duration_seconds") or 45)
     base_duration = max(5, target_duration // 5)
+    script_lines = [line for line in script_text.split("\n") if line.strip()] or [f"介绍{product.product_name}的核心卖点。"]
     shots = [
-        {"shot_id": "shot_01", "duration_seconds": base_duration, "purpose": "Hook", "camera": "slow push-in", "visual": "高质感背景 + 商品轮廓", "narration": script_text.split("\n")[0]},
-        {"shot_id": "shot_02", "duration_seconds": base_duration, "purpose": "Trust", "camera": "medium host shot", "visual": "数字人主播 + 品牌信任点字幕", "narration": script_text.split("\n")[1]},
-        {"shot_id": "shot_03", "duration_seconds": base_duration, "purpose": "Product", "camera": "macro detail", "visual": "包装、瓶身、权益贴图", "narration": script_text.split("\n")[2]},
-        {"shot_id": "shot_04", "duration_seconds": base_duration, "purpose": "Interaction", "camera": "host to product card", "visual": "公屏问题贴片 + 商品卡", "narration": script_text.split("\n")[4]},
-        {"shot_id": "shot_05", "duration_seconds": max(5, target_duration - base_duration * 4), "purpose": "CTA", "camera": "clean end card", "visual": "权益 POP + 合规提示", "narration": script_text.split("\n")[-1]},
+        {"shot_id": "shot_01", "duration_seconds": base_duration, "purpose": "Hook", "camera": "slow push-in", "visual": "高质感背景 + 商品轮廓", "narration": _script_line(script_lines, 0)},
+        {"shot_id": "shot_02", "duration_seconds": base_duration, "purpose": "Trust", "camera": "medium host shot", "visual": "数字人主播 + 品牌信任点字幕", "narration": _script_line(script_lines, 1)},
+        {"shot_id": "shot_03", "duration_seconds": base_duration, "purpose": "Product", "camera": "macro detail", "visual": "包装、瓶身、权益贴图", "narration": _script_line(script_lines, 2)},
+        {"shot_id": "shot_04", "duration_seconds": base_duration, "purpose": "Interaction", "camera": "host to product card", "visual": "公屏问题贴片 + 商品卡", "narration": _script_line(script_lines, 4)},
+        {"shot_id": "shot_05", "duration_seconds": max(5, target_duration - base_duration * 4), "purpose": "CTA", "camera": "clean end card", "visual": "权益 POP + 合规提示", "narration": script_lines[-1]},
     ]
     return {"shots": shots, "transitions": ["warm dissolve", "match cut", "subtle zoom"], "subtitle_style": "white sans-serif with champagne-gold keywords", "safe_area": "9:16 center", "product_id": product.product_id}
+
+
+def _script_line(lines: list[str], index: int) -> str:
+    if not lines:
+        return ""
+    return lines[min(index, len(lines) - 1)]
 
 
 def _video_visual_blueprint(product: ProductRecord, brand_name: str, director_plan: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:

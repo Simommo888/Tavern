@@ -177,6 +177,47 @@ class WorkbenchApiTests(unittest.TestCase):
             self.assertTrue(complete_video_assets)
             self.assertEqual(complete_video_assets[-1]["object_key"], workflow["final_video"]["uri"])
 
+    def test_product_video_workflow_supports_stepwise_agent_execution(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            workbench_module._service = WorkbenchService(Path(tmp))
+            client = TestClient(create_app())
+            payload = {
+                "brand_name": "龙八",
+                "duration_seconds": 45,
+                "api_key": "must-not-persist",
+                "product": {
+                    "product_name": "龙八礼盒",
+                    "sku": "LB-STEP-001",
+                    "price": 299,
+                    "selling_points": ["宴请送礼", "礼盒包装", "直播权益"],
+                    "scenes": ["商务宴请", "节日拜访"],
+                },
+            }
+
+            created = client.post("/api/v1/workflow/product-videos/runs", json=payload)
+            self.assertEqual(created.status_code, 200)
+            workflow = created.json()["workflow"]
+            run_id = workflow["run"]["workflow_run_id"]
+            self.assertEqual(workflow["run"]["status"], "running")
+            self.assertEqual(workflow["run"]["input_payload"]["request"]["api_key"], "***")
+            self.assertEqual([node["status"] for node in workflow["nodes"]], ["running"] + ["queued"] * 9)
+
+            for node_id in ["product_brand_input", "planner", "story", "script", "director", "visual_director", "asset", "image", "video", "editor"]:
+                result = client.post(f"/api/v1/workflow/product-videos/runs/{run_id}/nodes/{node_id}/run", json={})
+                self.assertEqual(result.status_code, 200)
+                workflow = result.json()["workflow"]
+
+            self.assertEqual(workflow["run"]["status"], "succeeded")
+            self.assertEqual(workflow["run"]["progress"], 1)
+            self.assertEqual(workflow["nodes"][-1]["output_payload"]["artifact"], "complete_video")
+            self.assertTrue(workflow["final_video"]["uri"].startswith("file://"))
+            planner_node = next(node for node in workflow["nodes"] if node["node_id"] == "planner")
+            video_node = next(node for node in workflow["nodes"] if node["node_id"] == "video")
+            self.assertEqual(planner_node["input_payload"]["provider_config"]["model"], "gpt-5.5")
+            self.assertEqual(planner_node["input_payload"]["provider_config"]["api_key_env"], "OPENAI_API_KEY")
+            self.assertEqual(video_node["input_payload"]["provider_config"]["provider"], "jimeng_ai")
+            self.assertEqual(video_node["input_payload"]["provider_config"]["api_key_env"], "TAVERN_JIMENG_API_KEY")
+
     def test_phase_nine_mvp_api_runs_product_to_saved_live_plan(self):
         with tempfile.TemporaryDirectory() as tmp:
             workbench_module._service = WorkbenchService(Path(tmp))

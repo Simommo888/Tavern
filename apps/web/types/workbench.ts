@@ -341,6 +341,27 @@ export type WorkflowRun = {
   updated_at: string;
 };
 
+export type ProductVideoWorkflowSnapshot = {
+  definition: WorkflowDefinition;
+  run: WorkflowRun;
+  nodes: WorkflowNodeRun[];
+  project: Project;
+  product: ProductRecord;
+  final_video: Record<string, unknown>;
+  artifacts: Record<string, string>;
+};
+
+export type WorkflowStartPayload = {
+  brand_name?: string;
+  duration_seconds?: number;
+  aspect_ratio?: string;
+  bgm_style?: string;
+  product_id?: string;
+  project_id?: string;
+  product?: Record<string, unknown>;
+  brand_profile?: Record<string, unknown>;
+};
+
 export type WorkflowNodeRun = {
   node_run_id: string;
   workflow_run_id: string;

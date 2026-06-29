@@ -280,6 +280,32 @@ def run_product_video_workflow(payload: dict[str, Any]) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
+@router.post("/workflow/product-videos/runs")
+def create_product_video_workflow_run(payload: dict[str, Any]) -> dict[str, Any]:
+    try:
+        return {"workflow": _service.create_product_video_workflow_run(payload)}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/workflow/product-videos/runs/{workflow_run_id}")
+def get_product_video_workflow_run(workflow_run_id: str) -> dict[str, Any]:
+    try:
+        return {"workflow": _service.get_product_video_workflow_snapshot(workflow_run_id)}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/workflow/product-videos/runs/{workflow_run_id}/nodes/{node_id}/run")
+def run_product_video_workflow_node(workflow_run_id: str, node_id: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    try:
+        return {"workflow": _service.run_product_video_workflow_node(workflow_run_id, node_id, payload or {})}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @router.get("/projects/{project_id}")
 def get_project(project_id: str) -> dict[str, Any]:
     try:
